@@ -1,5 +1,4 @@
 extends Node
-class_name AudioSynthesizer
 
 var player: AudioStreamPlayer
 var playback: AudioStreamGeneratorPlayback
@@ -24,15 +23,20 @@ func _process(_delta: float) -> void:
 		var sample: float = 0.0
 		for j in range(active_tones.size() - 1, -1, -1):
 			var t: Dictionary = active_tones[j]
-			var env: float = 1.0 - (t["elapsed"] / t["duration"])
-			var freq: float = lerpf(t["f_start"], t["f_end"], t["elapsed"] / t["duration"])
-			t["phase"] += (freq * TAU) / sample_rate
-			var sig: float = sin(t["phase"])
-			if t["noise"] > 0.0:
-				sig = sig * (1.0 - t["noise"]) + randf_range(-1.0, 1.0) * t["noise"]
-			sample += sig * env * t["amp"]
-			t["elapsed"] += 1.0 / sample_rate
-			if t["elapsed"] >= t["duration"]:
+			var dur: float = float(t["duration"])
+			var el: float = float(t["elapsed"])
+			var env: float = 1.0 - (el / dur)
+			var freq: float = lerpf(float(t["f_start"]), float(t["f_end"]), el / dur)
+			var ph: float = float(t["phase"]) + (freq * TAU) / sample_rate
+			t["phase"] = ph
+			var sig: float = sin(ph)
+			var nz: float = float(t["noise"])
+			if nz > 0.0:
+				sig = sig * (1.0 - nz) + randf_range(-1.0, 1.0) * nz
+			sample += sig * env * float(t["amp"])
+			el += 1.0 / sample_rate
+			t["elapsed"] = el
+			if el >= dur:
 				active_tones.remove_at(j)
 		sample = clampf(sample, -0.95, 0.95)
 		playback.push_frame(Vector2(sample, sample))
