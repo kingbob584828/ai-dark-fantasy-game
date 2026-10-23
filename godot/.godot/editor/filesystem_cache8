@@ -1,6 +1,7 @@
-ea4bc82a6ad023ab7ee23ee620429895
-::res://::1792782610
-export_presets.cfg::TextFile::-1::1792782610::0::1::::<><>::
+fc8a56933c4b1c8d796fdb8f7a9f9475
+::res://::1792783495
+export_presets.cfg::TextFile::-1::1792783474::0::1::::<><>::
+icon.png::CompressedTexture2D::3877343017164246314::1792783440::1792783495::1::::<><>::
 ::res://scenes/::1792782610
 Main.tscn::PackedScene::1328932072427126205::1792782610::0::1::::<><>::res://scripts/GameWorld.gd
 ::res://scripts/::1792782610
