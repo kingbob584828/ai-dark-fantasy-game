@@ -16,6 +16,7 @@ import android.media.AudioAttributes;
 import android.media.AudioFormat;
 import android.media.AudioTrack;
 import android.os.Bundle;
+import android.view.HapticFeedbackConstants;
 import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -872,6 +873,10 @@ public class MainActivity extends Activity {
             playerStam -= cost;
             slashTimer = heavy ? 0.28f : 0.20f;
             SynthAudio.playSwing(heavy);
+            performHapticFeedback(
+                    heavy ? HapticFeedbackConstants.LONG_PRESS : HapticFeedbackConstants.VIRTUAL_KEY,
+                    HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
+            );
 
             int dmg = (int) ((wpn.baseDamage + wpn.upgradeLevel * 9 + level * 4) * (heavy ? 1.55f : 1.0f));
             float reach = wpn.reach * (heavy ? 1.22f : 1.0f);
@@ -883,6 +888,10 @@ public class MainActivity extends Activity {
                     c.hp -= dmg;
                     c.hitFlash = 0.16f;
                     SynthAudio.playHit(heavy);
+                    performHapticFeedback(
+                            heavy ? HapticFeedbackConstants.LONG_PRESS : HapticFeedbackConstants.KEYBOARD_TAP,
+                            HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
+                    );
                     floatingTexts.add(new FloatingText(
                             c.x, c.y - 28f,
                             (heavy ? "CRIT " : "-") + dmg,
@@ -1240,10 +1249,18 @@ public class MainActivity extends Activity {
                                     c.stateTimer = 2.0f;
                                     floatingTexts.add(new FloatingText(c.x, c.y - 34f, "PARRIED!", Color.rgb(253, 224, 71)));
                                     SynthAudio.playParry();
+                                    performHapticFeedback(
+                                            HapticFeedbackConstants.LONG_PRESS,
+                                            HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
+                                    );
                                 } else if (dodgeTimer <= 0f) {
                                     playerHp -= c.damage;
                                     floatingTexts.add(new FloatingText(playerX, playerY - 30f, "-" + c.damage, Color.rgb(244, 63, 94)));
                                     SynthAudio.playHit(false);
+                                    performHapticFeedback(
+                                            HapticFeedbackConstants.LONG_PRESS,
+                                            HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
+                                    );
                                     if (playerHp <= 0f) {
                                         screenState = "DEATH";
                                     }

@@ -376,6 +376,78 @@ export default function App() {
     }
   };
 
+  // ==================== ANDROID & MOBILE HAPTIC FEEDBACK ENGINE ====================
+  const triggerHapticFeedback = useCallback(
+    (
+      type:
+        | 'attack_light'
+        | 'attack_heavy'
+        | 'hit_light'
+        | 'hit_heavy'
+        | 'parry'
+        | 'damage_taken'
+    ) => {
+      try {
+        // 1. Standard Android / Mobile Web Vibration API (navigator.vibrate)
+        if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+          switch (type) {
+            case 'attack_light':
+              navigator.vibrate(12);
+              break;
+            case 'attack_heavy':
+              navigator.vibrate(25);
+              break;
+            case 'hit_light':
+              navigator.vibrate([22, 18, 32]);
+              break;
+            case 'hit_heavy':
+              navigator.vibrate([42, 24, 68]);
+              break;
+            case 'parry':
+              navigator.vibrate([18, 16, 48]);
+              break;
+            case 'damage_taken':
+              navigator.vibrate([55, 28, 80]);
+              break;
+          }
+        }
+
+        // 2. Gamepad Haptic Actuator (for Bluetooth/USB controllers on Android & Desktop)
+        if (typeof navigator !== 'undefined' && typeof navigator.getGamepads === 'function') {
+          const pads = navigator.getGamepads();
+          const pad = pads?.[0] as (Gamepad & {
+            vibrationActuator?: {
+              playEffect?: (
+                effectType: string,
+                params: {
+                  startDelay?: number;
+                  duration: number;
+                  weakMagnitude: number;
+                  strongMagnitude: number;
+                }
+              ) => Promise<unknown>;
+            };
+          }) | null;
+          if (pad?.vibrationActuator?.playEffect) {
+            const isHeavy = type === 'hit_heavy' || type === 'damage_taken';
+            const isHit = type === 'hit_light' || type === 'parry';
+            pad.vibrationActuator
+              .playEffect('dual-rumble', {
+                startDelay: 0,
+                duration: isHeavy ? 140 : isHit ? 85 : 45,
+                weakMagnitude: isHeavy ? 0.9 : isHit ? 0.6 : 0.3,
+                strongMagnitude: isHeavy ? 1.0 : isHit ? 0.55 : 0.2,
+              })
+              .catch(() => {});
+          }
+        }
+      } catch {
+        // Ignore haptic errors on unsupported desktop browsers
+      }
+    },
+    []
+  );
+
   // ==================== CORE COMBAT & INTERACTION ACTIONS ====================
   const triggerPlayerAttack = useCallback((heavy: boolean) => {
     const eng = engineRef.current;
@@ -396,6 +468,7 @@ export default function App() {
     p.attackCooldown = (heavy ? 0.72 : 0.45) / speed;
 
     audioEngine.playSwing(heavy);
+    triggerHapticFeedback(heavy ? 'attack_heavy' : 'attack_light');
 
     // Calculate scaled damage
     const strScale =
@@ -535,10 +608,11 @@ export default function App() {
 
     if (hitAny) {
       audioEngine.playHit(heavy, isUmbralAmbush);
+      triggerHapticFeedback(heavy || isUmbralAmbush ? 'hit_heavy' : 'hit_light');
       eng.hitstopTimer = heavy || isUmbralAmbush ? 0.065 : 0.035;
       eng.shakeIntensity = heavy || isUmbralAmbush ? 7 : 3.5;
     }
-  }, []);
+  }, [triggerHapticFeedback]);
 
   const triggerPlayerDodge = useCallback(() => {
     const eng = engineRef.current;
@@ -554,8 +628,9 @@ export default function App() {
     p.dodgeTimer = 0.28; // i-frames active during dodgeTimer
     p.dodgeCooldown = 0.46;
     audioEngine.playDodge();
+    triggerHapticFeedback('attack_light');
     spawnParticles(p.x, p.y + 10, 6, '#94a3b8', 60, 3);
-  }, []);
+  }, [triggerHapticFeedback]);
 
   const triggerParryOrBlock = useCallback(() => {
     const eng = engineRef.current;
@@ -565,8 +640,9 @@ export default function App() {
       p.parryWindow = 0.26; // 260ms active parry deflection window
       p.stamina -= 10;
       audioEngine.playSwing(false);
+      triggerHapticFeedback('attack_light');
     }
-  }, []);
+  }, [triggerHapticFeedback]);
 
   const triggerCastSpell = useCallback(() => {
     const eng = engineRef.current;
@@ -637,6 +713,7 @@ export default function App() {
           newZone.synergyTriggered = true;
           newZone.synergyName = 'SINGULARITY CONFLAGRATION!';
           audioEngine.playSpellCast(spell.school, true);
+          triggerHapticFeedback('hit_heavy');
           eng.hitstopTimer = 0.075;
           eng.shakeIntensity = 12;
           spawnParticles(newZone.x, newZone.y, 32, '#f97316', 210, 6);
@@ -1203,6 +1280,7 @@ export default function App() {
                   p.hp -= 24;
                   p.hitFlash = 0.45;
                   audioEngine.playHit(true, false);
+                  triggerHapticFeedback('damage_taken');
                   addFloatingText(p.x, p.y - 24, '-24 SPIKE TRAP', '#f43f5e');
                 }
               }
@@ -1359,6 +1437,7 @@ export default function App() {
                   spawnParticles(c.x, c.y, 8, proj.color, 90, 4);
                   addFloatingText(c.x, c.y - 20, `${proj.damage}`, proj.color, proj.runicEmpowered);
                   audioEngine.playHit(false, !!proj.runicEmpowered);
+                  triggerHapticFeedback(proj.runicEmpowered ? 'hit_heavy' : 'hit_light');
                   eng.projectiles.splice(i, 1);
                   break;
                 }
@@ -1374,12 +1453,14 @@ export default function App() {
                     proj.vy = -proj.vy * 1.3;
                     proj.color = '#fde047';
                     audioEngine.playParryClang();
+                    triggerHapticFeedback('parry');
                     addFloatingText(p.x, p.y - 28, 'SPELL PARRIED!', '#fde047', true);
                   } else {
                     const dmg = Math.max(6, Math.round(proj.damage * (p.isBlocking ? 0.45 : 1.0)));
                     p.hp -= dmg;
                     p.hitFlash = 0.2;
                     audioEngine.playHit(false, false);
+                    triggerHapticFeedback('damage_taken');
                     addFloatingText(p.x, p.y - 24, `-${dmg}`, '#f43f5e');
                     eng.projectiles.splice(i, 1);
                   }
@@ -1644,6 +1725,7 @@ export default function App() {
                     eng.hitstopTimer = 0.08;
                     eng.shakeIntensity = 9;
                     audioEngine.playParryClang();
+                    triggerHapticFeedback('parry');
                     spawnParticles(p.x, p.y, 16, '#fde047', 130, 4);
                     addFloatingText(c.x, c.y - 32, 'PARRIED! RIPOSTE OPEN', '#fde047', true);
                   } else {
@@ -1657,6 +1739,7 @@ export default function App() {
                     p.hitFlash = 0.25;
                     eng.shakeIntensity = 6;
                     audioEngine.playHit(true, false);
+                    triggerHapticFeedback('damage_taken');
                     spawnParticles(p.x, p.y, 10, '#be123c', 110, 4);
                     addFloatingText(
                       p.x,
