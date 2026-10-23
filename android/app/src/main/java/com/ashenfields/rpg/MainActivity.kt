@@ -198,7 +198,7 @@ class MainActivity : ComponentActivity() {
     // Hardware Controller / Keyboard state shared with 60fps loop
     private var stickX by mutableFloatStateOf(0f)
     private var stickY by mutableFloatStateOf(0f)
-    private val keysHeld = mutableStateSetOf<Int>()
+    private val keysHeld = mutableStateListOf<Int>()
     private var pendingAttackLight by mutableStateOf(false)
     private var pendingAttackHeavy by mutableStateOf(false)
     private var pendingDodge by mutableStateOf(false)
@@ -250,7 +250,9 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        keysHeld.add(keyCode)
+        if (!keysHeld.contains(keyCode)) {
+            keysHeld.add(keyCode)
+        }
         when (keyCode) {
             KeyEvent.KEYCODE_BUTTON_X, KeyEvent.KEYCODE_BUTTON_R1, KeyEvent.KEYCODE_J -> {
                 pendingAttackLight = true; return true
@@ -288,7 +290,7 @@ fun AshenFieldsNativeApp(
     context: Context,
     hwStickX: Float,
     hwStickY: Float,
-    keysHeld: Set<Int>,
+    keysHeld: List<Int>,
     consumeLight: () -> Boolean,
     consumeHeavy: () -> Boolean,
     consumeDodge: () -> Boolean,
