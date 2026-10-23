@@ -67,6 +67,148 @@ export interface PlayerRenderState {
 // Snap helper for crisp pixel-cluster feel
 const px = (n: number) => Math.round(n / 2) * 2;
 
+// ==================== OFFSCREEN PIXEL-ART SPRITE CACHE ====================
+const spriteCache: Record<string, HTMLCanvasElement> = {};
+
+function bakePixelSprite(
+  key: string,
+  rows: string[],
+  palette: Record<string, string>,
+  scale = 3
+): HTMLCanvasElement {
+  if (spriteCache[key]) return spriteCache[key];
+  const h = rows.length;
+  const w = rows[0].length;
+  const canvas = document.createElement('canvas');
+  canvas.width = w * scale;
+  canvas.height = h * scale;
+  const c = canvas.getContext('2d');
+  if (c) {
+    c.imageSmoothingEnabled = false;
+    for (let y = 0; y < h; y++) {
+      const row = rows[y];
+      for (let x = 0; x < w; x++) {
+        const ch = row[x];
+        if (ch === '.' || !palette[ch]) continue;
+        c.fillStyle = palette[ch];
+        c.fillRect(x * scale, y * scale, scale, scale);
+      }
+    }
+  }
+  spriteCache[key] = canvas;
+  return canvas;
+}
+
+const HERO_F0 = [
+  '.....OOOOOO.....',
+  '....OHLLLLHO....',
+  '....OHLEELHO....',
+  '....OHOOOOHO....',
+  '...ORRRRRRRRO...',
+  '..ORCHHHHHHCRO..',
+  '..OCHLGGGGLHCO..',
+  '..OCHHHHHHHHCO..',
+  '..OCCGGGGGGCCO..',
+  '...OCCHHHHCCO...',
+  '...OCCCCCCCCO...',
+  '...OCC.OO.CCO...',
+  '....OBB..BBO....',
+  '....OBB..BBO....',
+  '....OOO..OOO....',
+];
+
+const HERO_F1 = [
+  '.....OOOOOO.....',
+  '....OHLLLLHO....',
+  '....OHLEELHO....',
+  '....OHOOOOHO....',
+  '...ORRRRRRRRO...',
+  '..ORCHHHHHHCRO..',
+  '..OCHLGGGGLHCO..',
+  '..OCHHHHHHHHCO..',
+  '..OCCGGGGGGCCO..',
+  '...OCCHHHHCCO...',
+  '..OCCCCCCCCCCO..',
+  '...OBB.OO.CCO...',
+  '...OOO....BBO...',
+  '..........OOO...',
+  '................',
+];
+
+const NPC_GRID = [
+  '.....OOOOOO.....',
+  '....OCCCCCCCO...',
+  '....OCCFFCCCO...',
+  '....OCCFFCCCO...',
+  '...OCCCCCCCCO...',
+  '..OCCAAAAAACC...',
+  '..OCCAGGGGACCO..',
+  '..OCCAAAAAACCO..',
+  '...OCCCCCCCCO...',
+  '...OCCCCCCCCO...',
+  '...OCCCCCCCCO...',
+  '....OBB..BBO....',
+  '....OBB..BBO....',
+  '....OOO..OOO....',
+];
+
+const STAG_GRID = [
+  '.........A..A...',
+  '........AA.AA...',
+  '.........AAA....',
+  '.........OBEO...',
+  '........OBBBO...',
+  '..OOOOOOOBBBO...',
+  '.OBBBBBBBBBBO...',
+  '.OBBBBBSSSSBO...',
+  '..OSSSSSSSO.....',
+  '..OBO...OBO.....',
+  '..OBO...OBO.....',
+  '..OOO...OOO.....',
+];
+
+const HOUND_GRID = [
+  '..........OOOO..',
+  '.........ORREEO.',
+  '..OOOOOOOORRRRO.',
+  '.ORGRRRRRDRRRDO.',
+  '.ORRRRRGRRRRRD..',
+  '..ODDDDDDDDDDO..',
+  '..ORO.....ORO...',
+  '..OOO.....OOO...',
+];
+
+const GUARD_GRID = [
+  '.....OOOOOO.....',
+  '....OSSSSSSO....',
+  '....OSGGGGSO....',
+  '...OOSSSSSSOO...',
+  '..OIIIIIIIIIIO..',
+  '..OIDGGGGGGDIO..',
+  '..OIDSSSSSSDIO..',
+  '..OIDDDDDDDDIO..',
+  '...ODDDDDDDDO...',
+  '....OSS..SSO....',
+  '....OOO..OOO....',
+];
+
+const BOSS_GRID = [
+  '........GGGGGGGG........',
+  '.......G........G.......',
+  '..FFWW..OOOOOOOO..WWFF..',
+  '.FFWWWW.OSSSSSSO.WWWWFF.',
+  'FFWWWWWWOSGGGGSOWWWWWWFF',
+  '.FFWWWWOOSSSSSSOOWWWWFF.',
+  '..FFWW.OSSSSSSSSO.WWFF..',
+  '...FF..OSSGGGGSSO..FF...',
+  '..FFWW.OSSDDDDSSO.WWFF..',
+  '.FFWWWW.OSSSSSSO.WWWWFF.',
+  '..FFWW..ODDDDDDO..WWFF..',
+  '........ODDDDDDO........',
+  '........OSS..SSO........',
+  '........OOO..OOO........',
+];
+
 export function renderGameWorld(
   ctx: CanvasRenderingContext2D,
   viewportW: number,
@@ -89,6 +231,7 @@ export function renderGameWorld(
   globalTime: number
 ) {
   ctx.save();
+  ctx.imageSmoothingEnabled = false;
 
   // 1. Base Sky / Void Backdrop with Multi-Layer Parallax
   ctx.fillStyle = region.ambientColor;
@@ -100,7 +243,6 @@ export function renderGameWorld(
   const parallaxOffsetX = -(camX * 0.2) % 320;
   for (let i = -1; i < Math.ceil(viewportW / 320) + 2; i++) {
     const bx = px(i * 320 + parallaxOffsetX);
-    // Distant spire / monolith silhouette
     ctx.fillRect(bx + 40, 0, 48, 95);
     ctx.fillRect(bx + 54, 0, 20, 130);
     ctx.fillRect(bx + 180, 0, 70, 75);
@@ -114,12 +256,17 @@ export function renderGameWorld(
   ctx.fillStyle = region.groundColorPrimary;
   ctx.fillRect(0, 0, region.width, region.height);
 
-  // Checker / Stone Tile Cluster Pattern (culled to camera viewport)
   const tileSize = 64;
   const startCol = Math.max(0, Math.floor(camX / tileSize));
-  const endCol = Math.min(Math.ceil(region.width / tileSize), Math.ceil((camX + viewportW) / tileSize));
+  const endCol = Math.min(
+    Math.ceil(region.width / tileSize),
+    Math.ceil((camX + viewportW) / tileSize)
+  );
   const startRow = Math.max(0, Math.floor(camY / tileSize));
-  const endRow = Math.min(Math.ceil(region.height / tileSize), Math.ceil((camY + viewportH) / tileSize));
+  const endRow = Math.min(
+    Math.ceil(region.height / tileSize),
+    Math.ceil((camY + viewportH) / tileSize)
+  );
 
   for (let r = startRow; r < endRow; r++) {
     for (let c = startCol; c < endCol; c++) {
@@ -132,18 +279,17 @@ export function renderGameWorld(
         ctx.fillRect(tx + 2, ty + 2, tileSize - 4, tileSize - 4);
       }
 
-      // Deliberate pixel-cluster stone cracks, moss tufts, or ash drifts
       if (hash < 45) {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.26)';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
         ctx.fillRect(tx + 12, ty + 18, 16, 4);
         ctx.fillRect(tx + 24, ty + 22, 4, 12);
       } else if (hash > 210) {
         ctx.fillStyle =
           region.id === 'bramblewood'
-            ? 'rgba(16, 185, 129, 0.14)'
+            ? 'rgba(16, 185, 129, 0.16)'
             : region.id === 'cathedral'
-            ? 'rgba(99, 102, 241, 0.12)'
-            : 'rgba(214, 211, 209, 0.07)';
+            ? 'rgba(99, 102, 241, 0.14)'
+            : 'rgba(214, 211, 209, 0.08)';
         ctx.fillRect(tx + 20, ty + 28, 12, 8);
         ctx.fillRect(tx + 28, ty + 24, 8, 6);
       }
@@ -172,7 +318,6 @@ export function renderGameWorld(
     ctx.strokeStyle = isShortcutLocked ? '#ef4444' : '#38bdf8';
     ctx.stroke();
 
-    // Inner runic threshold ring
     ctx.beginPath();
     ctx.arc(portal.x, portal.y, portal.radius * 0.6, 0, Math.PI * 2);
     ctx.strokeStyle = isShortcutLocked ? '#991b1b' : '#bae6fd';
@@ -191,7 +336,7 @@ export function renderGameWorld(
     ctx.restore();
   }
 
-  // 4. Active Magic Spell Zones (Graviturgy Wells, Pyromancy Tempests, Runic Sigils, Synergies)
+  // 4. Active Magic Spell Zones
   for (const zone of spellZones) {
     ctx.save();
     const pulse = Math.sin(globalTime * 8) * 5;
@@ -227,7 +372,6 @@ export function renderGameWorld(
     ctx.arc(zone.x, zone.y, zone.radius + pulse, 0, Math.PI * 2);
     ctx.fill();
 
-    // Geometric Runic Ring
     ctx.strokeStyle =
       zone.school === 'graviturgy'
         ? '#818cf8'
@@ -255,16 +399,13 @@ export function renderGameWorld(
     const y = px(prop.y - prop.height / 2);
 
     if (prop.type === 'bone_pyre_shrine') {
-      // Stone altar base
       ctx.fillStyle = '#292524';
       ctx.fillRect(x, y + 16, prop.width, prop.height - 16);
       ctx.fillStyle = '#57534e';
       ctx.fillRect(x + 6, y + 10, prop.width - 12, 12);
-      // Coiled sword in bone ash
       ctx.fillStyle = '#d6d3d1';
       ctx.fillRect(prop.x - 3, y - 14, 6, 28);
       ctx.fillRect(prop.x - 11, y - 6, 22, 4);
-      // Flickering ember flame
       const flameH = 18 + Math.sin(globalTime * 11) * 5;
       ctx.fillStyle = '#f59e0b';
       ctx.fillRect(prop.x - 10, y + 4 - flameH * 0.5, 20, flameH);
@@ -287,13 +428,11 @@ export function renderGameWorld(
       ctx.arc(prop.x, prop.y - 8 + floatY, 12, 0, Math.PI * 2);
       ctx.fill();
     } else if (prop.type === 'dead_tree') {
-      // Gnarled trunk & spore pods
       ctx.fillStyle = '#1c1917';
       ctx.fillRect(prop.x - 12, prop.y - 10, 24, 42);
       ctx.fillStyle = '#292524';
       ctx.fillRect(prop.x - 28, prop.y - 28, 56, 20);
       ctx.fillRect(prop.x - 20, prop.y - 42, 40, 16);
-      // Glowing blight spore clusters
       ctx.fillStyle = '#10b981';
       ctx.fillRect(prop.x - 18, prop.y - 24, 6, 6);
       ctx.fillRect(prop.x + 12, prop.y - 32, 6, 6);
@@ -331,7 +470,6 @@ export function renderGameWorld(
       ctx.fillStyle = unlocked ? '#10b981' : '#f59e0b';
       ctx.fillRect(x + 8, y + 8, prop.width - 16, prop.height - 16);
     } else {
-      // Ruined pillars, gothic arches, sarcophagi, fortress barricades
       ctx.fillStyle = 'rgba(0,0,0,0.45)';
       ctx.fillRect(x + 6, y + 8, prop.width, prop.height);
       ctx.fillStyle = '#27272a';
@@ -345,7 +483,7 @@ export function renderGameWorld(
     ctx.restore();
   }
 
-  // 6. Corpses (with Environmental Lore & Scavenger status)
+  // 6. Corpses
   for (const corpse of corpses) {
     ctx.save();
     ctx.fillStyle = corpse.scavenged ? 'rgba(127, 29, 29, 0.45)' : 'rgba(153, 27, 27, 0.7)';
@@ -353,7 +491,6 @@ export function renderGameWorld(
     ctx.ellipse(corpse.x, corpse.y + 4, 18, 9, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Ribcage / cloak pixel clusters
     ctx.fillStyle = corpse.scavenged ? '#78716c' : '#d6d3d1';
     ctx.fillRect(px(corpse.x - 10), px(corpse.y - 4), 20, 8);
     ctx.fillStyle = '#44403c';
@@ -369,7 +506,7 @@ export function renderGameWorld(
     ctx.restore();
   }
 
-  // 7. Player Recoverable Death Bloodstain (if any)
+  // 7. Player Recoverable Death Bloodstain
   if (player.bloodSpotX !== null && player.bloodSpotY !== null && player.bloodSpotAsh > 0) {
     ctx.save();
     const pulse = Math.sin(globalTime * 6) * 4;
@@ -385,20 +522,18 @@ export function renderGameWorld(
     ctx.restore();
   }
 
-  // 8. Autonomous Creatures & Bosses
+  // 8. Autonomous Creatures & Bosses (Pixel-Art Sprites)
   for (const c of creatures) {
     if (c.hp <= 0) continue;
     ctx.save();
     const bob = Math.sin(c.animTime * 6) * 3;
     const r = 18 * c.scale;
 
-    // Ground shadow
     ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
     ctx.beginPath();
     ctx.ellipse(c.x, c.y + r * 0.85, r * 0.9, r * 0.45, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Attack Telegraph Windup Ring & Cone!
     if (c.aiState === 'windup') {
       const progress = Math.min(1, 1 - c.stateTimer / Math.max(0.1, c.windupDuration));
       ctx.save();
@@ -414,83 +549,109 @@ export function renderGameWorld(
       ctx.restore();
     }
 
-    // Creature Silhouette by Role/Archetype
-    ctx.fillStyle = c.hitFlash > 0 ? '#ffffff' : c.colorPrimary;
+    let sprite: HTMLCanvasElement;
     if (c.isBoss) {
-      // Malakor, the Hollowed Seraph: 6-Winged Corrupted Seraphic Silhouette + Phase Halo
-      const wingSpread = 36 + Math.sin(globalTime * 5) * 6;
-      ctx.fillStyle = c.bossPhase === 3 ? '#e11d48' : c.bossPhase === 2 ? '#9333ea' : '#4f46e5';
-      // 3 pairs of jagged wings
-      for (let w = -1; w <= 1; w++) {
-        ctx.fillRect(px(c.x - wingSpread), px(c.y + w * 12 - 8 + bob), wingSpread * 2, 8);
-      }
-      // Armored torso
-      ctx.fillStyle = c.hitFlash > 0 ? '#ffffff' : '#e7e5e4';
-      ctx.fillRect(px(c.x - 16), px(c.y - 24 + bob), 32, 44);
-      // Burning Crown Halo
-      ctx.strokeStyle = c.bossPhase === 3 ? '#f43f5e' : '#fbbf24';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(c.x, c.y - 30 + bob, 16, 0, Math.PI * 2);
-      ctx.stroke();
+      sprite = bakePixelSprite(
+        `boss_${c.bossPhase}_${c.hitFlash > 0 ? 1 : 0}`,
+        BOSS_GRID,
+        {
+          O: '#0c0a12',
+          W: c.bossPhase === 3 ? '#e11d48' : c.bossPhase === 2 ? '#9333ea' : '#4f46e5',
+          F: '#f43f5e',
+          G: '#fbbf24',
+          S: c.hitFlash > 0 ? '#ffffff' : '#e2e8f0',
+          D: '#312e81',
+        },
+        4
+      );
     } else if (c.role === 'prey') {
-      // Antlered Ashen Stag
-      ctx.fillRect(px(c.x - 14), px(c.y - 8 + bob), 28, 16);
-      ctx.fillStyle = c.colorSecondary;
-      ctx.fillRect(px(c.x + 8), px(c.y - 22 + bob), 6, 16);
-      // Antlers
-      ctx.fillStyle = '#fef08a';
-      ctx.fillRect(px(c.x + 4), px(c.y - 28 + bob), 14, 3);
+      sprite = bakePixelSprite(
+        `stag_${c.hitFlash > 0 ? 1 : 0}`,
+        STAG_GRID,
+        {
+          O: '#0f172a',
+          A: '#fde047',
+          B: c.hitFlash > 0 ? '#ffffff' : c.colorPrimary,
+          S: c.colorSecondary,
+          E: '#38bdf8',
+        },
+        3
+      );
     } else if (c.role === 'predator') {
-      // Blight Hound with glowing spore pustules
-      ctx.fillRect(px(c.x - 16), px(c.y - 9 + bob), 32, 18);
-      ctx.fillStyle = c.colorSecondary;
-      ctx.fillRect(px(c.x - 8), px(c.y - 12 + bob), 6, 6);
-      ctx.fillRect(px(c.x + 4), px(c.y - 11 + bob), 6, 6);
+      sprite = bakePixelSprite(
+        `hound_${c.hitFlash > 0 ? 1 : 0}`,
+        HOUND_GRID,
+        {
+          O: '#0f0a0c',
+          R: c.hitFlash > 0 ? '#ffffff' : c.colorPrimary,
+          D: '#450a0a',
+          G: c.colorSecondary,
+          E: '#fbbf24',
+        },
+        3
+      );
     } else {
-      // Humanoid Knight / Ghoul / Spirit / Miniboss
-      const w = px(22 * c.scale);
-      const h = px(30 * c.scale);
-      ctx.fillRect(px(c.x - w / 2), px(c.y - h / 2 + bob), w, h);
-      ctx.fillStyle = c.colorSecondary;
-      ctx.fillRect(px(c.x - w / 3), px(c.y - h / 2 - 6 + bob), px((w * 2) / 3), 8);
+      sprite = bakePixelSprite(
+        `guard_${c.id}_${c.hitFlash > 0 ? 1 : 0}`,
+        GUARD_GRID,
+        {
+          O: '#0a0c16',
+          I: c.hitFlash > 0 ? '#ffffff' : c.colorPrimary,
+          S: '#cbd5e1',
+          G: c.colorSecondary,
+          D: '#1e1b4b',
+        },
+        Math.round(3 * c.scale)
+      );
     }
 
-    // Health bar & AI State Tag above creature
+    ctx.drawImage(
+      sprite,
+      Math.round(c.x - sprite.width / 2),
+      Math.round(c.y - sprite.height / 2 + bob)
+    );
+
     if (c.hp < c.maxHp || c.isMiniboss || c.aiState !== 'patrol') {
       const barW = c.isMiniboss ? 68 : 44;
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-      ctx.fillRect(c.x - barW / 2, c.y - r - 18, barW, 5);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.78)';
+      ctx.fillRect(c.x - barW / 2, c.y - r - 20, barW, 5);
       ctx.fillStyle = c.role === 'prey' ? '#38bdf8' : '#ef4444';
-      ctx.fillRect(c.x - barW / 2, c.y - r - 18, barW * Math.max(0, c.hp / c.maxHp), 5);
+      ctx.fillRect(c.x - barW / 2, c.y - r - 20, barW * Math.max(0, c.hp / c.maxHp), 5);
     }
     ctx.restore();
   }
 
-  // 9. Autonomous NPCs
+  // 9. Autonomous NPCs (Pixel-Art Sprites)
   for (const npc of npcs) {
     if (!npc.alive) continue;
     ctx.save();
     const bob = Math.sin(globalTime * 4 + npc.x) * 2;
 
-    // Shadow
     ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
     ctx.beginPath();
-    ctx.ellipse(npc.x, npc.y + 16, 15, 7, 0, 0, Math.PI * 2);
+    ctx.ellipse(npc.x, npc.y + 18, 15, 7, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Cloak & Armor
-    ctx.fillStyle = npc.hitFlash > 0 ? '#ffffff' : npc.colorCloak;
-    ctx.fillRect(px(npc.x - 12), px(npc.y - 14 + bob), 24, 28);
-    ctx.fillStyle = npc.colorArmor;
-    ctx.fillRect(px(npc.x - 8), px(npc.y - 10 + bob), 16, 18);
-    // Head & Hood
-    ctx.fillStyle = '#e7e5e4';
-    ctx.fillRect(px(npc.x - 6), px(npc.y - 22 + bob), 12, 10);
-    ctx.fillStyle = npc.colorAccent;
-    ctx.fillRect(px(npc.x - 7), px(npc.y - 24 + bob), 14, 4);
+    const npcSprite = bakePixelSprite(
+      `npc_${npc.id}_${npc.hitFlash > 0 ? 1 : 0}`,
+      NPC_GRID,
+      {
+        O: '#0c0e14',
+        C: npc.hitFlash > 0 ? '#ffffff' : npc.colorCloak,
+        A: npc.colorArmor,
+        G: npc.colorAccent,
+        F: '#e7e5e4',
+        B: '#1c1917',
+      },
+      3
+    );
 
-    // NPC Nameplate & Live Autonomous Action
+    ctx.drawImage(
+      npcSprite,
+      Math.round(npc.x - npcSprite.width / 2),
+      Math.round(npc.y - npcSprite.height / 2 + bob)
+    );
+
     ctx.font = '600 11px "Plus Jakarta Sans", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = npc.isCompanion ? '#34d399' : '#fde68a';
@@ -501,36 +662,46 @@ export function renderGameWorld(
     ctx.restore();
   }
 
-  // 10. Player Character
+  // 10. Player Character (Animated Pixel-Art Knight Sprite)
   ctx.save();
   if (player.umbralVeilActive) {
     ctx.globalAlpha = 0.48;
   }
-  const pBob = Math.hypot(player.vx, player.vy) > 5 ? Math.sin(player.animTime * 12) * 3 : Math.sin(globalTime * 4) * 1.5;
+  const isMoving = Math.hypot(player.vx, player.vy) > 5;
+  const pBob = isMoving ? Math.sin(player.animTime * 12) * 2.5 : Math.sin(globalTime * 4) * 1.5;
 
-  // Dodge afterimage
   if (player.isDodging) {
     ctx.fillStyle = 'rgba(56, 189, 248, 0.32)';
     ctx.fillRect(px(player.x - player.vx * 0.04 - 11), px(player.y - player.vy * 0.04 - 16), 22, 32);
   }
 
-  // Ground shadow
   ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
   ctx.beginPath();
-  ctx.ellipse(player.x, player.y + 17, 16, 8, 0, 0, Math.PI * 2);
+  ctx.ellipse(player.x, player.y + 19, 16, 8, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Cloak & Armor Silhouette
-  ctx.fillStyle = player.hitFlash > 0 ? '#ffffff' : '#1e293b';
-  ctx.fillRect(px(player.x - 12), px(player.y - 14 + pBob), 24, 28);
-  ctx.fillStyle = player.hitFlash > 0 ? '#ffffff' : '#94a3b8';
-  ctx.fillRect(px(player.x - 8), px(player.y - 10 + pBob), 16, 18);
-  // Head & Tarnished Helm
-  ctx.fillStyle = '#d6d3d1';
-  ctx.fillRect(px(player.x - 7), px(player.y - 23 + pBob), 14, 11);
-  // Crimson scarf accent
-  ctx.fillStyle = '#be123c';
-  ctx.fillRect(px(player.x - 9), px(player.y - 12 + pBob), 18, 4);
+  const walkFrame = isMoving && Math.floor(player.animTime * 8) % 2 === 1 ? 1 : 0;
+  const heroSprite = bakePixelSprite(
+    `hero_${walkFrame}_${player.hitFlash > 0 ? 1 : 0}`,
+    walkFrame === 1 ? HERO_F1 : HERO_F0,
+    {
+      O: '#0c0e14',
+      H: player.hitFlash > 0 ? '#ffffff' : '#94a3b8',
+      L: '#e2e8f0',
+      E: '#38bdf8',
+      R: '#be123c',
+      C: '#1e293b',
+      G: '#f59e0b',
+      B: '#1c1917',
+    },
+    3
+  );
+
+  ctx.drawImage(
+    heroSprite,
+    Math.round(player.x - heroSprite.width / 2),
+    Math.round(player.y - heroSprite.height / 2 + pBob)
+  );
 
   // Equipped Weapon rendered along facing angle
   ctx.save();
@@ -550,7 +721,6 @@ export function renderGameWorld(
   ctx.fillRect(8, -6, 4, 12);
   ctx.restore();
 
-  // Parry / Block Shield Aura
   if (player.isBlocking || player.isParrying) {
     ctx.strokeStyle = player.isParrying ? '#fde047' : '#38bdf8';
     ctx.lineWidth = player.isParrying ? 3 : 2;
@@ -586,7 +756,7 @@ export function renderGameWorld(
     ctx.restore();
   }
 
-  // 12. Atmospheric Particles (Ash, Spores, Embers, Blood drops)
+  // 12. Atmospheric Particles
   for (const pt of particles) {
     ctx.save();
     ctx.globalAlpha = Math.max(0, pt.alpha * (pt.life / pt.maxLife));
@@ -595,7 +765,7 @@ export function renderGameWorld(
     ctx.restore();
   }
 
-  // 13. Floating Combat Numbers & Status Callouts
+  // 13. Floating Combat Numbers
   for (const ft of floatingTexts) {
     ctx.save();
     ctx.font = ft.isCrit ? '700 14px "JetBrains Mono", monospace' : '600 12px "JetBrains Mono", monospace';
@@ -605,7 +775,7 @@ export function renderGameWorld(
     ctx.restore();
   }
 
-  // 14. Dynamic Lighting & Contrast Pass (Warm Torchlight vs Cold Moonlight)
+  // 14. Dynamic Lighting & Contrast Pass
   ctx.save();
   for (const prop of region.props) {
     if (!prop.lightColor || !prop.lightRadius) continue;
@@ -621,7 +791,6 @@ export function renderGameWorld(
     ctx.fill();
   }
 
-  // Player personal lantern warm rim glow
   const pGlow = ctx.createRadialGradient(player.x, player.y, 8, player.x, player.y, 190);
   pGlow.addColorStop(0, 'rgba(251, 191, 36, 0.16)');
   pGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
@@ -633,7 +802,7 @@ export function renderGameWorld(
 
   ctx.restore();
 
-  // 15. Screen-Space Atmospheric Vignette (Low-occlusion, preserves 85%+ clear viewport)
+  // 15. Screen-Space Atmospheric Vignette
   const vig = ctx.createRadialGradient(
     viewportW / 2,
     viewportH / 2,

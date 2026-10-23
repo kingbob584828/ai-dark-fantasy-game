@@ -2427,20 +2427,20 @@ export default function App() {
 
       {/* 3. LOW-OCCLUSION WORLD-MATCHED PERIMETER HUD (Playing State) */}
       {screenState === 'PLAYING' && (
-        <div className="fixed inset-0 z-20 pointer-events-none flex flex-col justify-between p-4 md:p-6">
+        <div className="fixed inset-0 z-20 pointer-events-none flex flex-col justify-between p-2.5 sm:p-4 md:p-5 overflow-hidden">
           {/* Top Perimeter Row: Player Vital Bars (Left) · Boss Bar (Center) · Region & Quick Nav (Right) */}
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-wrap items-start justify-between gap-2 sm:gap-4 w-full">
             {/* Top-Left: Player Vital Bars, Weapon, Spell & Sovereign Ash */}
-            <div className="pointer-events-auto bg-[#11131a]/90 border border-[#2d2820] rounded p-3 space-y-2 min-w-[250px] shadow-lg">
+            <div className="pointer-events-auto bg-[#11131a]/92 border border-[#2d2820] rounded-lg p-2.5 sm:p-3 space-y-1.5 w-[210px] sm:w-[250px] max-w-[46vw] shadow-lg shrink-0">
               {/* HP Bar */}
               <div className="space-y-0.5">
-                <div className="flex justify-between text-xs font-mono-tabular">
+                <div className="flex justify-between text-[11px] sm:text-xs font-mono-tabular">
                   <span className="text-stone-300 font-medium">Vitality</span>
                   <span className="text-rose-300">
-                    {hudStats.hp} / {hudStats.maxHp}
+                    {hudStats.hp}/{hudStats.maxHp}
                   </span>
                 </div>
-                <div className="w-full h-2.5 bg-[#090a0f] rounded overflow-hidden border border-rose-950/60">
+                <div className="w-full h-2 bg-[#090a0f] rounded overflow-hidden border border-rose-950/60">
                   <div
                     className="h-full bg-gradient-to-r from-rose-800 to-rose-500 transition-all duration-150"
                     style={{ width: `${(hudStats.hp / Math.max(1, hudStats.maxHp)) * 100}%` }}
@@ -2450,13 +2450,13 @@ export default function App() {
 
               {/* Stamina Bar */}
               <div className="space-y-0.5">
-                <div className="flex justify-between text-xs font-mono-tabular">
+                <div className="flex justify-between text-[11px] sm:text-xs font-mono-tabular">
                   <span className="text-stone-300 font-medium">Stamina</span>
                   <span className="text-emerald-300">
-                    {hudStats.stamina} / {hudStats.maxStamina}
+                    {hudStats.stamina}/{hudStats.maxStamina}
                   </span>
                 </div>
-                <div className="w-full h-2 bg-[#090a0f] rounded overflow-hidden border border-emerald-950/60">
+                <div className="w-full h-1.5 bg-[#090a0f] rounded overflow-hidden border border-emerald-950/60">
                   <div
                     className="h-full bg-gradient-to-r from-emerald-800 to-emerald-500 transition-all duration-100"
                     style={{
@@ -2468,13 +2468,13 @@ export default function App() {
 
               {/* Mana Bar */}
               <div className="space-y-0.5">
-                <div className="flex justify-between text-xs font-mono-tabular">
-                  <span className="text-stone-300 font-medium">Astral Focus</span>
+                <div className="flex justify-between text-[11px] sm:text-xs font-mono-tabular">
+                  <span className="text-stone-300 font-medium">Focus</span>
                   <span className="text-sky-300">
-                    {hudStats.mana} / {hudStats.maxMana}
+                    {hudStats.mana}/{hudStats.maxMana}
                   </span>
                 </div>
-                <div className="w-full h-2 bg-[#090a0f] rounded overflow-hidden border border-sky-950/60">
+                <div className="w-full h-1.5 bg-[#090a0f] rounded overflow-hidden border border-sky-950/60">
                   <div
                     className="h-full bg-gradient-to-r from-indigo-800 to-sky-400 transition-all duration-150"
                     style={{ width: `${(hudStats.mana / Math.max(1, hudStats.maxMana)) * 100}%` }}
@@ -2483,46 +2483,44 @@ export default function App() {
               </div>
 
               {/* Unboxed Equipment & Ash Metadata */}
-              <div className="pt-1 border-t border-[#25221b] flex flex-wrap items-center justify-between gap-2 text-xs font-mono-tabular text-stone-300">
-                <span className="truncate max-w-[140px]">
+              <div className="pt-1 border-t border-[#25221b] flex items-center justify-between gap-1.5 text-[11px] sm:text-xs font-mono-tabular text-stone-300">
+                <span className="truncate max-w-[115px] sm:max-w-[140px]">
                   {equipped.weapon?.name || 'Unarmed'}
                 </span>
-                <span>·</span>
-                <span className="text-amber-400">{ash} Ash</span>
+                <span className="text-amber-400 shrink-0">{ash} Ash</span>
               </div>
 
-              <div className="flex items-center justify-between gap-2 text-xs font-mono-tabular text-stone-400">
+              <div className="flex items-center justify-between gap-1.5 text-[11px] sm:text-xs font-mono-tabular text-stone-400">
                 <button
                   onClick={() => {
                     const idx = spells.findIndex((s) => s.id === activeSpellId);
                     const next = spells[(idx + 1) % spells.length];
                     if (next) setActiveSpellId(next.id);
                   }}
-                  className="text-indigo-300 hover:text-indigo-200 underline-offset-2 hover:underline truncate whitespace-nowrap"
+                  className="text-indigo-300 hover:text-indigo-200 underline-offset-2 hover:underline truncate"
                 >
-                  Spell: {attunedSpell?.name} (Cycle)
+                  {attunedSpell?.name}
                 </button>
-                <span>·</span>
                 <button
                   onClick={triggerQuickHeal}
-                  className="text-rose-300 hover:text-rose-200 whitespace-nowrap"
+                  className="text-rose-300 hover:text-rose-200 whitespace-nowrap shrink-0"
                 >
-                  Flask ×{flaskCount} [R]
+                  Flask ×{flaskCount}
                 </button>
               </div>
             </div>
 
             {/* Top-Center: Boss / Miniboss Health Bar */}
             {hudStats.bossName && (
-              <div className="flex-1 max-w-lg mx-auto bg-[#11131a]/90 border border-rose-900/60 rounded px-4 py-2.5 text-center shadow-xl">
-                <div className="font-display text-sm font-semibold text-amber-200 tracking-wide">
+              <div className="flex-1 min-w-[180px] max-w-md mx-auto bg-[#11131a]/92 border border-rose-900/60 rounded-lg px-3 py-2 text-center shadow-xl">
+                <div className="font-display text-xs sm:text-sm font-semibold text-amber-200 tracking-wide truncate">
                   {hudStats.bossName}
                   {hudStats.bossPhase > 1 ? ` · Phase ${hudStats.bossPhase}` : ''}
                 </div>
                 {hudStats.bossTitle && (
-                  <div className="text-[11px] text-stone-400">{hudStats.bossTitle}</div>
+                  <div className="text-[10px] sm:text-[11px] text-stone-400 truncate">{hudStats.bossTitle}</div>
                 )}
-                <div className="w-full h-3 bg-[#090a0f] rounded overflow-hidden border border-rose-900/70 mt-1.5">
+                <div className="w-full h-2.5 bg-[#090a0f] rounded overflow-hidden border border-rose-900/70 mt-1">
                   <div
                     className="h-full bg-gradient-to-r from-rose-900 via-red-600 to-amber-500 transition-all duration-150"
                     style={{
@@ -2533,61 +2531,73 @@ export default function App() {
               </div>
             )}
 
-            {/* Top-Right: Current Region & Clean Single-Line Action Bar */}
-            <div className="pointer-events-auto flex flex-col items-end gap-2">
-              <div className="bg-[#11131a]/90 border border-[#2d2820] rounded px-3.5 py-2 text-right">
-                <div className="font-display text-sm font-semibold text-amber-300">
+            {/* Top-Right: Current Region & Clean Responsive Action Bar */}
+            <div className="pointer-events-auto flex flex-col items-end gap-1.5 max-w-[50vw]">
+              <div className="bg-[#11131a]/92 border border-[#2d2820] rounded-lg px-3 py-1.5 text-right max-w-full">
+                <div className="font-display text-xs sm:text-sm font-semibold text-amber-300 truncate">
                   {REGIONS[currentRegion].name}
                 </div>
-                <div className="text-xs text-stone-400 font-mono-tabular">
+                <div className="text-[10px] sm:text-xs text-stone-400 font-mono-tabular truncate">
                   <span>Food {Math.round(worldState.settlementFood)}%</span>
-                  <span className="mx-1.5" aria-hidden="true">·</span>
+                  <span className="mx-1" aria-hidden="true">·</span>
                   <span>Cinder {Math.round(worldState.cinderCovenantPower)}</span>
-                  <span className="mx-1.5" aria-hidden="true">·</span>
-                  <span>Umbral {Math.round(worldState.umbralSynodPower)}</span>
+                  <span className="mx-1" aria-hidden="true">·</span>
+                  <span>Synod {Math.round(worldState.umbralSynodPower)}</span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5 bg-[#11131a]/90 border border-[#2d2820] rounded p-1">
+              <div className="flex flex-wrap items-center justify-end gap-1 bg-[#11131a]/92 border border-[#2d2820] rounded-lg p-1">
                 <button
                   onClick={() => setActiveModal('inventory')}
-                  className="px-2.5 py-1 text-xs font-medium text-stone-300 hover:text-amber-300 rounded whitespace-nowrap shrink-0"
+                  className="px-2 py-1 text-[11px] sm:text-xs font-medium text-stone-300 hover:text-amber-300 rounded whitespace-nowrap shrink-0"
                 >
-                  Inventory (I)
+                  Gear
                 </button>
                 <button
                   onClick={() => setActiveModal('grimoire')}
-                  className="px-2.5 py-1 text-xs font-medium text-stone-300 hover:text-amber-300 rounded whitespace-nowrap shrink-0"
+                  className="px-2 py-1 text-[11px] sm:text-xs font-medium text-stone-300 hover:text-amber-300 rounded whitespace-nowrap shrink-0"
                 >
-                  Magic (G)
+                  Spells
                 </button>
                 <button
                   onClick={() => {
                     setNpcs([...engineRef.current.npcs]);
                     setActiveModal('world_ai');
                   }}
-                  className="px-2.5 py-1 text-xs font-medium text-amber-300 hover:text-amber-200 bg-amber-950/40 rounded whitespace-nowrap shrink-0"
+                  className="px-2 py-1 text-[11px] sm:text-xs font-medium text-amber-300 hover:text-amber-200 bg-amber-950/40 rounded whitespace-nowrap shrink-0"
                 >
-                  AI World (Tab)
+                  AI World
                 </button>
                 <button
                   onClick={() => setActiveModal('map')}
-                  className="px-2.5 py-1 text-xs font-medium text-stone-300 hover:text-amber-300 rounded whitespace-nowrap shrink-0"
+                  className="px-2 py-1 text-[11px] sm:text-xs font-medium text-stone-300 hover:text-amber-300 rounded whitespace-nowrap shrink-0"
                 >
-                  Map (M)
+                  Map
+                </button>
+                <button
+                  onClick={() =>
+                    setInputMode((prev) => (prev === 'touch' ? 'keyboard_mouse' : 'touch'))
+                  }
+                  className={`px-2 py-1 text-[11px] sm:text-xs font-medium rounded whitespace-nowrap shrink-0 ${
+                    inputMode === 'touch'
+                      ? 'bg-amber-700 text-white'
+                      : 'text-stone-300 hover:text-amber-300'
+                  }`}
+                >
+                  Touch Pad
                 </button>
                 <button
                   onClick={() => setActiveModal('settings')}
-                  className="px-2.5 py-1 text-xs font-medium text-stone-300 hover:text-amber-300 rounded whitespace-nowrap shrink-0"
+                  className="px-2 py-1 text-[11px] sm:text-xs font-medium text-stone-300 hover:text-amber-300 rounded whitespace-nowrap shrink-0"
                 >
                   System
                 </button>
                 <button
                   onClick={toggleFullscreen}
                   title="Toggle Fullscreen (F11)"
-                  className="px-2.5 py-1 text-xs font-medium text-amber-200 hover:text-white bg-[#1e1c17] hover:bg-amber-800/60 border border-[#383227] rounded whitespace-nowrap shrink-0"
+                  className="px-2 py-1 text-[11px] sm:text-xs font-medium text-amber-200 hover:text-white bg-[#1e1c17] hover:bg-amber-800/60 border border-[#383227] rounded whitespace-nowrap shrink-0"
                 >
-                  {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+                  {isFullscreen ? 'Exit FS' : 'Fullscreen'}
                 </button>
               </div>
             </div>
@@ -2595,122 +2605,169 @@ export default function App() {
 
           {/* Center Banner Toast (Region Discovery / Synergy / World Event) */}
           {hudStats.bannerToast && (
-            <div className="mx-auto my-auto bg-[#0d0f15]/95 border border-amber-700/60 px-6 py-3 rounded shadow-2xl text-center max-w-xl">
-              <div className="font-display text-sm md:text-base font-semibold tracking-wider text-amber-300">
+            <div className="mx-auto my-auto bg-[#0d0f15]/95 border border-amber-700/60 px-4 py-2.5 rounded-lg shadow-2xl text-center max-w-md">
+              <div className="font-display text-xs sm:text-sm font-semibold tracking-wider text-amber-300">
                 {hudStats.bannerToast}
               </div>
             </div>
           )}
 
-          {/* Bottom Perimeter Row: Live World Event Ticker (Left) & Context Action / Touch Controls (Right) */}
-          <div className="flex items-end justify-between gap-4">
-            {/* Latest Emergent World Simulation Event */}
-            <div className="pointer-events-auto hidden sm:block max-w-md bg-[#11131a]/88 border border-[#28241d] rounded p-3 text-xs space-y-1">
+          {/* Bottom-Center Context Interact Prompt */}
+          {hudStats.interactPrompt && (
+            <div className="pointer-events-auto mx-auto mb-2">
+              <button
+                onClick={triggerInteract}
+                className="px-5 py-2.5 text-xs font-display font-semibold tracking-wider bg-amber-700 hover:bg-amber-600 text-white border border-amber-400/60 rounded-lg shadow-xl whitespace-nowrap shrink-0"
+              >
+                [ACT] {hudStats.interactPrompt}
+              </button>
+            </div>
+          )}
+
+          {/* Desktop-Only Living World Event Ticker (Hidden when Touch Pad is active so Left Movement Pad is never displaced) */}
+          {inputMode !== 'touch' && (
+            <div className="pointer-events-auto hidden lg:block max-w-sm bg-[#11131a]/88 border border-[#28241d] rounded-lg p-3 text-xs space-y-1">
               <div className="flex items-center justify-between text-stone-400 font-mono-tabular">
-                <span className="text-amber-400 font-medium">
+                <span className="text-amber-400 font-medium truncate">
                   Living World · {worldState.events[0]?.title}
                 </span>
-                <span>Input: {inputMode.replace('_', ' ')}</span>
               </div>
               <p className="text-stone-300 line-clamp-2 leading-snug">
                 {worldState.events[0]?.description}
               </p>
             </div>
+          )}
 
-            {/* Interactive Prompt Button */}
-            {hudStats.interactPrompt && (
-              <div className="pointer-events-auto mx-auto">
-                <button
-                  onClick={triggerInteract}
-                  className="px-5 py-2.5 text-xs font-display font-semibold tracking-wider bg-amber-700 hover:bg-amber-600 text-white border border-amber-400/60 rounded shadow-xl whitespace-nowrap shrink-0"
-                >
-                  [E] {hudStats.interactPrompt}
-                </button>
-              </div>
-            )}
-
-            {/* Touchscreen Virtual Controls (Shown automatically when Touch device detected or selected) */}
-            {inputMode === 'touch' && (
-              <div className="pointer-events-auto flex items-end justify-between w-full gap-4">
-                {/* Virtual Directional Pad */}
-                <div className="grid grid-cols-3 gap-1.5 w-36 h-36 bg-[#11131a]/80 p-2 rounded-full border border-[#2e2a22]">
+          {/* PINNED BOTTOM-LEFT MOVEMENT PAD & PINNED BOTTOM-RIGHT ACTION CLUSTER */}
+          {inputMode === 'touch' && (
+            <>
+              {/* Bottom-Left: Dedicated Left-Hand Movement Pad (D-Pad + Analog Center) */}
+              <div className="pointer-events-auto fixed bottom-4 left-4 z-30 flex flex-col items-center">
+                <div className="grid grid-cols-3 gap-1.5 w-36 h-36 sm:w-40 sm:h-40 bg-[#11131a]/88 p-2.5 rounded-full border-2 border-[#443c2e] shadow-2xl">
                   <div />
                   <button
-                    onTouchStart={() => (engineRef.current.touchMoveY = -1)}
+                    onTouchStart={(e) => {
+                      e.preventDefault();
+                      engineRef.current.touchMoveY = -1;
+                    }}
                     onTouchEnd={() => (engineRef.current.touchMoveY = 0)}
-                    className="bg-[#23201a] active:bg-amber-700 rounded text-xs text-stone-200 font-bold"
+                    onMouseDown={() => (engineRef.current.touchMoveY = -1)}
+                    onMouseUp={() => (engineRef.current.touchMoveY = 0)}
+                    className="bg-[#23201a] active:bg-amber-700 border border-[#4a4233] rounded-lg text-sm text-stone-100 font-bold flex items-center justify-center"
                   >
                     ▲
                   </button>
                   <div />
                   <button
-                    onTouchStart={() => (engineRef.current.touchMoveX = -1)}
+                    onTouchStart={(e) => {
+                      e.preventDefault();
+                      engineRef.current.touchMoveX = -1;
+                    }}
                     onTouchEnd={() => (engineRef.current.touchMoveX = 0)}
-                    className="bg-[#23201a] active:bg-amber-700 rounded text-xs text-stone-200 font-bold"
+                    onMouseDown={() => (engineRef.current.touchMoveX = -1)}
+                    onMouseUp={() => (engineRef.current.touchMoveX = 0)}
+                    className="bg-[#23201a] active:bg-amber-700 border border-[#4a4233] rounded-lg text-sm text-stone-100 font-bold flex items-center justify-center"
                   >
-                    ◀
+                    ◄
                   </button>
-                  <div className="bg-[#161820] rounded-full" />
+                  <div className="bg-amber-500/80 border border-amber-200 rounded-full m-1.5 shadow-inner" />
                   <button
-                    onTouchStart={() => (engineRef.current.touchMoveX = 1)}
+                    onTouchStart={(e) => {
+                      e.preventDefault();
+                      engineRef.current.touchMoveX = 1;
+                    }}
                     onTouchEnd={() => (engineRef.current.touchMoveX = 0)}
-                    className="bg-[#23201a] active:bg-amber-700 rounded text-xs text-stone-200 font-bold"
+                    onMouseDown={() => (engineRef.current.touchMoveX = 1)}
+                    onMouseUp={() => (engineRef.current.touchMoveX = 0)}
+                    className="bg-[#23201a] active:bg-amber-700 border border-[#4a4233] rounded-lg text-sm text-stone-100 font-bold flex items-center justify-center"
                   >
-                    ▶
+                    ►
                   </button>
                   <div />
                   <button
-                    onTouchStart={() => (engineRef.current.touchMoveY = 1)}
+                    onTouchStart={(e) => {
+                      e.preventDefault();
+                      engineRef.current.touchMoveY = 1;
+                    }}
                     onTouchEnd={() => (engineRef.current.touchMoveY = 0)}
-                    className="bg-[#23201a] active:bg-amber-700 rounded text-xs text-stone-200 font-bold"
+                    onMouseDown={() => (engineRef.current.touchMoveY = 1)}
+                    onMouseUp={() => (engineRef.current.touchMoveY = 0)}
+                    className="bg-[#23201a] active:bg-amber-700 border border-[#4a4233] rounded-lg text-sm text-stone-100 font-bold flex items-center justify-center"
                   >
                     ▼
                   </button>
                   <div />
                 </div>
-
-                {/* Touch Combat Action Cluster */}
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onTouchStart={() => triggerPlayerAttack(false)}
-                    className="w-14 h-14 bg-amber-800/80 active:bg-amber-600 border border-amber-500/50 rounded-full text-xs font-semibold text-white"
-                  >
-                    Strike
-                  </button>
-                  <button
-                    onTouchStart={() => triggerPlayerAttack(true)}
-                    className="w-14 h-14 bg-rose-900/80 active:bg-rose-700 border border-rose-500/50 rounded-full text-xs font-semibold text-white"
-                  >
-                    Heavy
-                  </button>
-                  <button
-                    onTouchStart={triggerPlayerDodge}
-                    className="w-14 h-14 bg-sky-900/80 active:bg-sky-700 border border-sky-500/50 rounded-full text-xs font-semibold text-white"
-                  >
-                    Dodge
-                  </button>
-                  <button
-                    onTouchStart={triggerCastSpell}
-                    className="w-14 h-14 bg-indigo-900/80 active:bg-indigo-700 border border-indigo-500/50 rounded-full text-xs font-semibold text-white"
-                  >
-                    Spell
-                  </button>
-                  <button
-                    onTouchStart={triggerParryOrBlock}
-                    className="w-14 h-14 bg-stone-800/80 active:bg-stone-600 border border-stone-500/50 rounded-full text-xs font-semibold text-white"
-                  >
-                    Parry
-                  </button>
-                  <button
-                    onTouchStart={triggerInteract}
-                    className="w-14 h-14 bg-emerald-900/80 active:bg-emerald-700 border border-emerald-500/50 rounded-full text-xs font-semibold text-white"
-                  >
-                    Act
-                  </button>
-                </div>
+                <span className="mt-1 text-[10px] font-mono-tabular uppercase tracking-wider text-stone-400">
+                  Move
+                </span>
               </div>
-            )}
-          </div>
+
+              {/* Bottom-Right: Dedicated Right-Hand Combat Action Cluster */}
+              <div className="pointer-events-auto fixed bottom-4 right-4 z-30 grid grid-cols-3 gap-2 sm:gap-2.5 bg-[#11131a]/75 p-2.5 rounded-2xl border border-[#352f24]">
+                <button
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    triggerPlayerAttack(false);
+                  }}
+                  onClick={() => triggerPlayerAttack(false)}
+                  className="w-14 h-14 sm:w-16 sm:h-16 bg-amber-800/90 active:bg-amber-600 border-2 border-amber-400/70 rounded-full text-xs font-bold text-white shadow-lg"
+                >
+                  Strike
+                </button>
+                <button
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    triggerPlayerAttack(true);
+                  }}
+                  onClick={() => triggerPlayerAttack(true)}
+                  className="w-14 h-14 sm:w-16 sm:h-16 bg-rose-900/90 active:bg-rose-700 border-2 border-rose-400/70 rounded-full text-xs font-bold text-white shadow-lg"
+                >
+                  Heavy
+                </button>
+                <button
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    triggerPlayerDodge();
+                  }}
+                  onClick={triggerPlayerDodge}
+                  className="w-14 h-14 sm:w-16 sm:h-16 bg-sky-900/90 active:bg-sky-700 border-2 border-sky-400/70 rounded-full text-xs font-bold text-white shadow-lg"
+                >
+                  Dodge
+                </button>
+                <button
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    triggerCastSpell();
+                  }}
+                  onClick={triggerCastSpell}
+                  className="w-14 h-14 sm:w-16 sm:h-16 bg-indigo-900/90 active:bg-indigo-700 border-2 border-indigo-400/70 rounded-full text-xs font-bold text-white shadow-lg"
+                >
+                  Spell
+                </button>
+                <button
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    triggerParryOrBlock();
+                  }}
+                  onClick={triggerParryOrBlock}
+                  className="w-14 h-14 sm:w-16 sm:h-16 bg-stone-800/90 active:bg-stone-600 border-2 border-stone-400/70 rounded-full text-xs font-bold text-white shadow-lg"
+                >
+                  Parry
+                </button>
+                <button
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    triggerInteract();
+                  }}
+                  onClick={triggerInteract}
+                  className="w-14 h-14 sm:w-16 sm:h-16 bg-emerald-900/90 active:bg-emerald-700 border-2 border-emerald-400/70 rounded-full text-xs font-bold text-white shadow-lg"
+                >
+                  Act
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 
