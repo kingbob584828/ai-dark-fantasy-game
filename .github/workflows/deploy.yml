@@ -1,4 +1,4 @@
-name: Build & Release Live Web Preview + Native Android APK
+name: Build & Release Live Web Preview + Godot 4 & Native Android APK
 
 on:
   push:
@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # 1. Build Static Web Bundle & Deploy to GitHub Pages
+  # 1. Build Playable Web Bundle + Godot 4.3 WebAssembly Export & Deploy to GitHub Pages
   build-and-deploy-web:
     runs-on: ubuntu-latest
     steps:
@@ -44,6 +44,7 @@ jobs:
               "express": "^4.21.2",
               "lucide-react": "^0.475.0",
               "motion": "^12.4.7",
+              "phaser": "^3.87.0",
               "react": "^19.0.0",
               "react-dom": "^19.0.0",
               "vite": "^6.2.0"
@@ -66,6 +67,18 @@ jobs:
 
       - name: Build static playable web game
         run: npm run build
+
+      - name: Export Godot 4.3 WebAssembly Build into dist/godot
+        continue-on-error: true
+        run: |
+          mkdir -p ./dist/godot ~/.local/share/godot/export_templates/4.3.stable
+          curl -fsSL https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip -o /tmp/godot.zip
+          unzip -q /tmp/godot.zip -d /tmp
+          chmod +x /tmp/Godot_v4.3-stable_linux.x86_64
+          curl -fsSL https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz -o /tmp/templates.tpz
+          unzip -q /tmp/templates.tpz -d /tmp/templates
+          mv /tmp/templates/templates/* ~/.local/share/godot/export_templates/4.3.stable/
+          /tmp/Godot_v4.3-stable_linux.x86_64 --headless --path ./godot --export-release "Web" ../dist/godot/index.html || true
 
       - name: Deploy web bundle to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
@@ -90,7 +103,7 @@ jobs:
         uses: actions/deploy-pages@v4
         continue-on-error: true
 
-  # 2. Build 100% Native Android APK (Hardware Canvas + AudioTrack, No WebView) & Publish to GitHub Releases
+  # 2. Build Native Android APK + Godot 4.3 Engine Package & Publish to GitHub Releases
   build-and-release-native-apk:
     runs-on: ubuntu-latest
     steps:
@@ -138,11 +151,17 @@ jobs:
           /tmp/gradle-8.7/bin/gradle assembleRelease --no-daemon --stacktrace
           cp app/build/outputs/apk/release/app-release.apk ../AshenFields-Native-v1.0.0.apk
 
-      - name: Upload Native APK Build Artifact
+      - name: Package Godot 4.3 Engine Project Archive
+        run: |
+          zip -r ./AshenFields-Godot4-Engine-Project.zip ./godot
+
+      - name: Upload Native APK & Godot 4 Project Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: AshenFields-Native-Android-APK
-          path: ./AshenFields-Native-v1.0.0.apk
+          name: AshenFields-Release-Packages
+          path: |
+            ./AshenFields-Native-v1.0.0.apk
+            ./AshenFields-Godot4-Engine-Project.zip
 
       - name: Ensure Release Tag v1.0.0 Exists
         run: |
@@ -151,16 +170,20 @@ jobs:
           git tag -f v1.0.0
           git push -f origin v1.0.0 || true
 
-      - name: Publish Native APK & Web Preview Link to GitHub Releases
+      - name: Publish Native APK, Godot 4 Engine Project & Web Preview Link to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.0
           target_commitish: ${{ github.sha }}
-          name: "Ashen Fields v1.0.0 — Native Android APK & Live Web Release"
+          name: "Ashen Fields v1.0.0 — Godot 4.3 Engine, Native Android APK & Live Web Release"
           body: |
-            ### Ashen Fields — Cross-Platform Release
-            - **Live Web Preview (GitHub Pages)**: [https://kingbob584828.github.io/ai-dark-fantasy-game/](https://kingbob584828.github.io/ai-dark-fantasy-game/) (Supports `F11` & UI Fullscreen toggle)
-            - **Native Android APK (`AshenFields-Native-v1.0.0.apk`)**: 100% Native Android hardware-accelerated 2D `Canvas` & `AudioTrack` PCM synth engine (Zero WebView). Supports Multi-Touch Twin-Stick + 6-Button Combat Cluster, Bluetooth/USB Gamepad Controllers, and Hardware Keyboards in landscape fullscreen.
-          files: ./AshenFields-Native-v1.0.0.apk
+            ### Ashen Fields — Cross-Platform Release (Godot 4.3 + Native Android + Web)
+            - **Live Web Preview (GitHub Pages)**: [https://kingbob584828.github.io/ai-dark-fantasy-game/](https://kingbob584828.github.io/ai-dark-fantasy-game/)
+            - **Godot 4.3 WebAssembly Build**: [https://kingbob584828.github.io/ai-dark-fantasy-game/godot/](https://kingbob584828.github.io/ai-dark-fantasy-game/godot/)
+            - **Native Android APK (`AshenFields-Native-v1.0.0.apk`)**: 100% Native Android hardware-accelerated 2D engine & PCM synth (Zero WebView), with Haptic Feedback, Populated Gothic Regions, Autonomous NPCs, and Tactical Mini-Map Radar.
+            - **Godot 4.3 Engine Project (`AshenFields-Godot4-Engine-Project.zip`)**: Complete Godot 4.3 project (`project.godot`, `export_presets.cfg`, `scenes/Main.tscn`, and GDScript `.gd` engine scripts).
+          files: |
+            ./AshenFields-Native-v1.0.0.apk
+            ./AshenFields-Godot4-Engine-Project.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
