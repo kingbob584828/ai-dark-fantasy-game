@@ -1,0 +1,6 @@
+{
+  "name": "Ashen Fields",
+  "description": "A 2D dark fantasy action RPG set in an autonomous, AI-driven living world of decaying ruins, interconnected magic, and emergent faction warfare.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
