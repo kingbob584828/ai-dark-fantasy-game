@@ -58,6 +58,8 @@ interface GameModalsProps {
   onSetInputMode: (mode: InputDeviceMode) => void;
   muted: boolean;
   onToggleMute: () => void;
+  isFullscreen: boolean;
+  onToggleFullscreen: () => void;
   onSaveGame: () => void;
   onLoadGame: () => void;
   onResetWorld: () => void;
@@ -96,6 +98,8 @@ export const GameModals: React.FC<GameModalsProps> = ({
   onSetInputMode,
   muted,
   onToggleMute,
+  isFullscreen,
+  onToggleFullscreen,
   onSaveGame,
   onLoadGame,
   onResetWorld,
@@ -1414,6 +1418,12 @@ export const GameModals: React.FC<GameModalsProps> = ({
                     Audio & Device Input Mode (Auto-Detected: {inputMode.replace('_', ' ')})
                   </h3>
                   <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={onToggleFullscreen}
+                      className="px-3.5 py-1.5 text-xs font-medium bg-amber-800/70 hover:bg-amber-700 text-amber-100 border border-amber-600/50 rounded whitespace-nowrap shrink-0"
+                    >
+                      {isFullscreen ? 'Exit Fullscreen (F11)' : 'Enter Fullscreen (F11)'}
+                    </button>
                     <button
                       onClick={onToggleMute}
                       className="px-3.5 py-1.5 text-xs font-medium bg-[#22201b] hover:bg-[#2e2b24] text-stone-200 rounded whitespace-nowrap shrink-0"

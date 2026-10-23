@@ -59,6 +59,53 @@ export default function App() {
     return 'keyboard_mouse';
   });
   const [muted, setMuted] = useState<boolean>(false);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
+  const toggleFullscreen = useCallback(async () => {
+    try {
+      const doc = document as Document & {
+        webkitFullscreenElement?: Element;
+        webkitExitFullscreen?: () => Promise<void>;
+      };
+      const elem = document.documentElement as HTMLElement & {
+        webkitRequestFullscreen?: () => Promise<void>;
+      };
+
+      if (!doc.fullscreenElement && !doc.webkitFullscreenElement) {
+        if (elem.requestFullscreen) {
+          await elem.requestFullscreen();
+        } else if (elem.webkitRequestFullscreen) {
+          await elem.webkitRequestFullscreen();
+        }
+        setIsFullscreen(true);
+      } else {
+        if (doc.exitFullscreen) {
+          await doc.exitFullscreen();
+        } else if (doc.webkitExitFullscreen) {
+          await doc.webkitExitFullscreen();
+        }
+        setIsFullscreen(false);
+      }
+    } catch {
+      // If inside a restricted iframe without fullscreen attribute, inform user
+      engineRef.current.bannerMessage =
+        'Fullscreen blocked by preview frame · Open Shared App URL or GitHub Pages in a new tab for Fullscreen';
+      engineRef.current.bannerTimer = 4.5;
+    }
+  }, []);
+
+  useEffect(() => {
+    const onFsChange = () => {
+      const doc = document as Document & { webkitFullscreenElement?: Element };
+      setIsFullscreen(Boolean(doc.fullscreenElement || doc.webkitFullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', onFsChange);
+    document.addEventListener('webkitfullscreenchange', onFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFsChange);
+      document.removeEventListener('webkitfullscreenchange', onFsChange);
+    };
+  }, []);
 
   // Player Progression & RPG State (Synced with mutable engine ref for 60fps loop)
   const [level, setLevel] = useState<number>(1);
@@ -888,6 +935,12 @@ export default function App() {
       setInputMode('keyboard_mouse');
       const key = e.key.toLowerCase();
       engineRef.current.keysHeld.add(key);
+
+      if (key === 'f11' || (e.altKey && key === 'enter')) {
+        e.preventDefault();
+        toggleFullscreen();
+        return;
+      }
 
       if (engineRef.current.screenState === 'TITLE_MENU') {
         if (key === 'enter' || key === ' ') {
@@ -2355,12 +2408,19 @@ export default function App() {
                   Continue Saved Chronicle
                 </button>
               )}
+
+              <button
+                onClick={toggleFullscreen}
+                className="px-5 py-3 text-sm font-display font-semibold tracking-wider bg-[#151720] hover:bg-[#202330] text-stone-200 border border-[#322e26] rounded transition-colors whitespace-nowrap shrink-0"
+              >
+                {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+              </button>
             </div>
           </div>
 
           {/* Flat Single-Line Control Hint */}
           <div className="text-xs text-stone-400 font-mono-tabular text-center">
-            WASD Move · Space Dodge · Click/J Attack · Q Cast Spell · F Parry · E Interact · Tab AI World Inspector
+            WASD Move · Space Dodge · Click/J Attack · Q Cast Spell · F Parry · E Interact · F11 Fullscreen
           </div>
         </div>
       )}
@@ -2522,6 +2582,13 @@ export default function App() {
                 >
                   System
                 </button>
+                <button
+                  onClick={toggleFullscreen}
+                  title="Toggle Fullscreen (F11)"
+                  className="px-2.5 py-1 text-xs font-medium text-amber-200 hover:text-white bg-[#1e1c17] hover:bg-amber-800/60 border border-[#383227] rounded whitespace-nowrap shrink-0"
+                >
+                  {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+                </button>
               </div>
             </div>
           </div>
@@ -2661,6 +2728,12 @@ export default function App() {
                 className="w-full py-2.5 text-xs font-medium bg-amber-700 hover:bg-amber-600 text-white rounded"
               >
                 Resume Game
+              </button>
+              <button
+                onClick={toggleFullscreen}
+                className="w-full py-2.5 text-xs font-medium bg-[#1f1d18] hover:bg-[#2b2821] text-amber-200 border border-[#3a342a] rounded"
+              >
+                {isFullscreen ? 'Exit Fullscreen (F11)' : 'Enter Fullscreen (F11)'}
               </button>
               <button
                 onClick={handleSaveGame}
@@ -2921,6 +2994,8 @@ export default function App() {
           setMuted(next);
           audioEngine.setMuted(next);
         }}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
         onSaveGame={handleSaveGame}
         onLoadGame={handleLoadGame}
         onResetWorld={() => {
