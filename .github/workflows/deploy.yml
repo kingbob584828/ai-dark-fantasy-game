@@ -44,6 +44,7 @@ jobs:
       - name: Generate Android Debug & Release Keystores
         run: |
           rm -f /tmp/release-keystore.jks /tmp/debug.keystore
+          mkdir -p ~/.local/share/godot/keystores
           keytool -genkeypair -v \
             -keystore /tmp/release-keystore.jks \
             -alias ashenkey \
@@ -62,21 +63,11 @@ jobs:
             -storepass android \
             -keypass android \
             -dname "CN=Android Debug,O=Android,C=US"
+          cp /tmp/debug.keystore ~/.local/share/godot/keystores/debug.keystore
 
       - name: Install Godot 4.3 Engine & Export Signed Android APK
         run: |
           mkdir -p ~/.local/share/godot/export_templates/4.3.stable ~/.config/godot
-          cat <<EOF > ~/.config/godot/editor_settings-4.tres
-          [gd_resource type="EditorSettings" format=3]
-
-          [resource]
-          export/android/java_sdk_path = "${JAVA_HOME}"
-          export/android/android_sdk_path = "${ANDROID_SDK_ROOT}"
-          export/android/debug_keystore = "/tmp/debug.keystore"
-          export/android/debug_keystore_user = "androiddebugkey"
-          export/android/debug_keystore_pass = "android"
-          EOF
-          cp ~/.config/godot/editor_settings-4.tres ~/.config/godot/editor_settings-4.3.tres
           curl -fsSL https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip -o /tmp/godot.zip
           unzip -q -o /tmp/godot.zip -d /tmp
           chmod +x /tmp/Godot_v4.3-stable_linux.x86_64
@@ -90,7 +81,11 @@ jobs:
           export GODOT_ANDROID_KEYSTORE_RELEASE_USER="ashenkey"
           export GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD="ashenfields123"
           /tmp/Godot_v4.3-stable_linux.x86_64 --headless --path ./godot --import
-          /tmp/Godot_v4.3-stable_linux.x86_64 --headless --path ./godot --export-release "Android" /tmp/AshenFields-Godot4-v1.0.0.apk
+          sed -i "s|export/android/java_sdk_path = \"\"|export/android/java_sdk_path = \"${JAVA_HOME}\"|g" ~/.config/godot/editor_settings-4.3.tres
+          sed -i "s|export/android/android_sdk_path = \"\"|export/android/android_sdk_path = \"${ANDROID_SDK_ROOT}\"|g" ~/.config/godot/editor_settings-4.3.tres
+          sed -i "s|export/android/shutdown_adb_on_exit = true|export/android/shutdown_adb_on_exit = false|g" ~/.config/godot/editor_settings-4.3.tres
+          grep "export/android" ~/.config/godot/editor_settings-4.3.tres
+          /tmp/Godot_v4.3-stable_linux.x86_64 --headless --verbose --path ./godot --export-release "Android" /tmp/AshenFields-Godot4-v1.0.0.apk
           cp /tmp/AshenFields-Godot4-v1.0.0.apk ./AshenFields-Godot4-v1.0.0.apk
           ls -lh ./AshenFields-Godot4-v1.0.0.apk
           zip -r ./AshenFields-Godot4-Engine-Project.zip ./godot
@@ -122,7 +117,7 @@ jobs:
             - **Download Godot 4.3 Engine Source Project (`AshenFields-Godot4-Engine-Project.zip`)**: Complete Godot 4.3 project (`project.godot`, `export_presets.cfg`, `scenes/Main.tscn`, and `scripts/*.gd`).
 
             #### Key Features in the Godot 4.3 Android APK
-            - **6 Interconnected Populated Regions**: Oakhaven Vigil, The Weeping Woods, Drowned Fens, WhisperingBarrow, Sunken Reliquary, and The Star-Crater.
+            - **6 Interconnected Populated Regions**: Oakhaven Vigil, The Weeping Woods, Drowned Fens, Whispering Barrow, Sunken Reliquary, and The Star-Crater.
             - **Rich World Architecture**: Multi-tile Gothic structures, cobblestone highways, timber bridges, shimmering lakes & lava craters, shrines, Star-Iron anvils, chests, and harvestable resource nodes.
             - **7 Autonomous AI NPCs**: Real-time waypoint schedules, dynamic overhead speech bubbles, active combat targeting against nearby monsters, multi-branch lore dialogue, item bartering, and companion recruitment.
             - **6 Attributes, 7 Weapons & 6 Magic Schools + 3 Synergies**: Full RPG character progression, Star-Iron weapon tempering (`+1` to `+5`), and persistent save/load (`user://ashen_fields_save.json`).
