@@ -103,18 +103,18 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept Android SDK Licenses & Provision Platform 34
+      - name: Configure Android SDK & Accept Licenses
         run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager "platforms;android-34" "build-tools;34.0.0" || true
-
-      - name: Set up Gradle 8.7
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: '8.7'
+          export ANDROID_SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          export ANDROID_HOME="$ANDROID_SDK_ROOT"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager | head -n 1)
+          if [ -n "$SDKMANAGER" ]; then
+            yes | "$SDKMANAGER" --licenses > /dev/null || true
+            "$SDKMANAGER" "platform-tools" "platforms;android-34" "build-tools;34.0.0" || true
+          fi
 
       - name: Generate Release Signing Keystore
         working-directory: ./android/app
@@ -130,10 +130,12 @@ jobs:
             -keypass ashenfields123 \
             -dname "CN=AshenFields, OU=Game, O=AshenFields, L=Vigil, S=Ash, C=US"
 
-      - name: Build Signed Native Android Release APK
+      - name: Build Signed Native Android Release APK (Gradle 8.7)
         working-directory: ./android
         run: |
-          gradle assembleRelease --no-daemon --stacktrace
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.7-bin.zip -o /tmp/gradle-8.7.zip
+          unzip -q -d /tmp /tmp/gradle-8.7.zip
+          /tmp/gradle-8.7/bin/gradle assembleRelease --no-daemon --stacktrace
           cp app/build/outputs/apk/release/app-release.apk ../AshenFields-Native-v1.0.0.apk
 
       - name: Upload Native APK Build Artifact
