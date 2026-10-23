@@ -90,7 +90,7 @@ jobs:
         uses: actions/deploy-pages@v4
         continue-on-error: true
 
-  # 2. Build 100% Native Android APK (Kotlin + Jetpack Compose Canvas, No WebView) & Publish to GitHub Releases
+  # 2. Build 100% Native Android APK (Hardware Canvas + AudioTrack, No WebView) & Publish to GitHub Releases
   build-and-release-native-apk:
     runs-on: ubuntu-latest
     steps:
@@ -106,8 +106,10 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Accept Android SDK Licenses
-        run: yes | sdkmanager --licenses || true
+      - name: Accept Android SDK Licenses & Provision Platform 34
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" || true
 
       - name: Set up Gradle 8.7
         uses: gradle/actions/setup-gradle@v3
@@ -140,15 +142,23 @@ jobs:
           name: AshenFields-Native-Android-APK
           path: ./AshenFields-Native-v1.0.0.apk
 
-      - name: Publish Native APK & Web Bundle to GitHub Releases
+      - name: Ensure Release Tag v1.0.0 Exists
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -f v1.0.0
+          git push -f origin v1.0.0 || true
+
+      - name: Publish Native APK & Web Preview Link to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.0
+          target_commitish: ${{ github.sha }}
           name: "Ashen Fields v1.0.0 — Native Android APK & Live Web Release"
           body: |
             ### Ashen Fields — Cross-Platform Release
-            - **Native Android APK (`AshenFields-Native-v1.0.0.apk`)**: 100% native Kotlin + Jetpack Compose 2D hardware-accelerated `Canvas` & `AudioTrack` PCM synth engine (No WebView). Supports Multi-Touch Twin-Stick + Action Cluster, Bluetooth/USB Gamepad Controllers, and Hardware Keyboards in landscape fullscreen.
-            - **Live Web Preview**: Play directly in your browser via GitHub Pages (with `F11` / UI Fullscreen toggle).
+            - **Live Web Preview (GitHub Pages)**: [https://kingbob584828.github.io/ai-dark-fantasy-game/](https://kingbob584828.github.io/ai-dark-fantasy-game/) (Supports `F11` & UI Fullscreen toggle)
+            - **Native Android APK (`AshenFields-Native-v1.0.0.apk`)**: 100% Native Android hardware-accelerated 2D `Canvas` & `AudioTrack` PCM synth engine (Zero WebView). Supports Multi-Touch Twin-Stick + 6-Button Combat Cluster, Bluetooth/USB Gamepad Controllers, and Hardware Keyboards in landscape fullscreen.
           files: ./AshenFields-Native-v1.0.0.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

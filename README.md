@@ -2,26 +2,25 @@
 
 A cross-platform 2D dark fantasy action RPG set in an autonomous, AI-driven living world.
 
+- **Play Live in Browser (GitHub Pages)**: [**https://kingbob584828.github.io/ai-dark-fantasy-game/**](https://kingbob584828.github.io/ai-dark-fantasy-game/)
+- **Download Native Android APK (GitHub Releases)**: [**AshenFields-Native-v1.0.0.apk**](https://github.com/kingbob584828/ai-dark-fantasy-game/releases/latest/download/AshenFields-Native-v1.0.0.apk) · [View All Releases](https://github.com/kingbob584828/ai-dark-fantasy-game/releases)
+- **Repository**: [https://github.com/kingbob584828/ai-dark-fantasy-game](https://github.com/kingbob584828/ai-dark-fantasy-game)
+
 ---
 
 ## 1. Live Web Preview (GitHub Pages + Fullscreen Mode)
 
-The web edition features a dedicated **Fullscreen** button on the Title Screen, in the Top-Right HUD bar, and in the Pause/Settings menu (as well as the `F11` or `Alt+Enter` shortcut).
-
-### Activate Your Live GitHub Pages Preview:
-1. Open your repository on GitHub and go to **Settings** → **Pages**.
-2. Under **Build and deployment** → **Source**, select **GitHub Actions**.
-3. Once the **Build & Release Live Web Preview + Native Android APK** workflow finishes, your live web preview link (`https://<username>.github.io/<repo-name>/`) will be live.
+- **Live URL**: [https://kingbob584828.github.io/ai-dark-fantasy-game/](https://kingbob584828.github.io/ai-dark-fantasy-game/)
+- Features a dedicated **Fullscreen** toggle button on the Title Screen, in the Top-Right HUD bar, and in the Pause/Settings menu (plus `F11` or `Alt+Enter` keyboard shortcuts).
+- If launching for the first time, ensure **Settings → Pages → Build and deployment → Source** is set to **GitHub Actions** (or **Deploy from a branch → `gh-pages`**).
 
 ---
 
-## 2. Native Android APK (GitHub Releases — No WebView)
+## 2. Native Android APK (GitHub Releases — Zero WebView)
 
-The `/android` directory contains a **100% Native Android application** written in **Kotlin + Jetpack Compose `Canvas` + Android `AudioTrack` PCM synthesis** (`com.ashenfields.rpg`). It does **not** use a WebView.
-
-### Download the Native APK:
-1. On every push to `main`/`master`, GitHub Actions automatically compiles and signs `AshenFields-Native-v1.0.0.apk` and publishes it to your repository's **Releases** section (`v1.0.0`).
-2. Go to the **Releases** sidebar on your GitHub repository and download **`AshenFields-Native-v1.0.0.apk`** onto any Android phone, tablet, or handheld gaming device.
+- **Direct APK Download**: [AshenFields-Native-v1.0.0.apk](https://github.com/kingbob584828/ai-dark-fantasy-game/releases/latest/download/AshenFields-Native-v1.0.0.apk)
+- **Releases Page**: [https://github.com/kingbob584828/ai-dark-fantasy-game/releases](https://github.com/kingbob584828/ai-dark-fantasy-game/releases)
+- The `/android` directory contains a **100% Native Android application** (`com.ashenfields.rpg`) built directly on Android's hardware-accelerated `android.graphics.Canvas`, `android.view.View`, and `android.media.AudioTrack` PCM synthesizer. It contains **zero WebView components** and **zero external Maven dependencies** for fast, deterministic builds.
 
 ---
 
@@ -29,4 +28,4 @@ The `/android` directory contains a **100% Native Android application** written 
 
 - **Keyboard & Mouse**: `WASD` Move · `Space` Dodge Roll (i-frames) · `Left-Click` / `J` Light Attack · `Shift+Click` / `K` Heavy Attack · `Q` / `Right-Click` Cast Spell · `F` Parry / Block · `R` Crimson Draught (Heal) · `E` Interact · `F11` Fullscreen · `Tab` AI Living World Inspector
 - **Gamepad / Controller**: Left Stick Move · `X`/`RB` Light Attack · `Y`/`RT` Heavy Attack · `A`/`B` Dodge · `LB` Parry · `LT` Cast Spell · `D-Pad Up` Heal · `D-Pad Down` Interact
-- **Touchscreen**: Virtual joystick and 6-button combat action cluster (`Strike`, `Heavy`, `Dodge`, `Spell`, `Parry`, `Act/Heal`).
+- **Touchscreen**: Multi-touch virtual joystick (bottom-left) and 6-button combat action cluster (`Strike`, `Heavy`, `Dodge`, `Spell`, `Parry`, `Act/Heal` on bottom-right).
