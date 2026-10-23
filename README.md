@@ -4,6 +4,7 @@ A cross-platform 2D dark fantasy action RPG set in an autonomous, AI-driven livi
 
 - **Play Live in Browser (GitHub Pages)**: [**https://kingbob584828.github.io/ai-dark-fantasy-game/**](https://kingbob584828.github.io/ai-dark-fantasy-game/)
 - **Play Godot 4.3 WebAssembly Export**: [**https://kingbob584828.github.io/ai-dark-fantasy-game/godot/**](https://kingbob584828.github.io/ai-dark-fantasy-game/godot/)
+- **Download Godot 4.3 Android APK (GitHub Releases)**: [**AshenFields-Godot4-v1.0.0.apk**](https://github.com/kingbob584828/ai-dark-fantasy-game/releases/latest/download/AshenFields-Godot4-v1.0.0.apk)
 - **Download Native Android APK (GitHub Releases)**: [**AshenFields-Native-v1.0.0.apk**](https://github.com/kingbob584828/ai-dark-fantasy-game/releases/latest/download/AshenFields-Native-v1.0.0.apk) · [View All Releases](https://github.com/kingbob584828/ai-dark-fantasy-game/releases)
 - **Download Godot 4.3 Engine Project**: [**AshenFields-Godot4-Engine-Project.zip**](https://github.com/kingbob584828/ai-dark-fantasy-game/releases/latest/download/AshenFields-Godot4-Engine-Project.zip)
 - **Repository**: [https://github.com/kingbob584828/ai-dark-fantasy-game](https://github.com/kingbob584828/ai-dark-fantasy-game)

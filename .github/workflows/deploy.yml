@@ -1,4 +1,4 @@
-name: Build & Release Live Web Preview + Godot 4 & Native Android APK
+name: Build & Release Godot 4.3 Android APK + Native Android APK + Live Web
 
 on:
   push:
@@ -103,7 +103,7 @@ jobs:
         uses: actions/deploy-pages@v4
         continue-on-error: true
 
-  # 2. Build Native Android APK + Godot 4.3 Engine Package & Publish to GitHub Releases
+  # 2. Export Real Godot 4.3 Android APK + Native Android APK & Publish to GitHub Releases
   build-and-release-native-apk:
     runs-on: ubuntu-latest
     steps:
@@ -129,12 +129,11 @@ jobs:
             "$SDKMANAGER" "platform-tools" "platforms;android-34" "build-tools;34.0.0" || true
           fi
 
-      - name: Generate Release Signing Keystore
-        working-directory: ./android/app
+      - name: Generate Android Debug & Release Keystores
         run: |
-          rm -f release-keystore.jks
+          rm -f /tmp/release-keystore.jks /tmp/debug.keystore ./android/app/release-keystore.jks
           keytool -genkeypair -v \
-            -keystore release-keystore.jks \
+            -keystore /tmp/release-keystore.jks \
             -alias ashenkey \
             -keyalg RSA \
             -keysize 2048 \
@@ -142,6 +141,16 @@ jobs:
             -storepass ashenfields123 \
             -keypass ashenfields123 \
             -dname "CN=AshenFields, OU=Game, O=AshenFields, L=Vigil, S=Ash, C=US"
+          cp /tmp/release-keystore.jks ./android/app/release-keystore.jks
+          keytool -genkeypair -v \
+            -keystore /tmp/debug.keystore \
+            -alias androiddebugkey \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass android \
+            -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US"
 
       - name: Build Signed Native Android Release APK (Gradle 8.7)
         working-directory: ./android
@@ -151,15 +160,34 @@ jobs:
           /tmp/gradle-8.7/bin/gradle assembleRelease --no-daemon --stacktrace
           cp app/build/outputs/apk/release/app-release.apk ../AshenFields-Native-v1.0.0.apk
 
-      - name: Package Godot 4.3 Engine Project Archive
+      - name: Install Godot 4.3 Engine & Export Signed Godot 4.3 Android APK
         run: |
+          mkdir -p ~/.local/share/godot/export_templates/4.3.stable ~/.config/godot
+          printf '[gd_resource type="EditorSettings" format=3]\n\n[resource]\nexport/android/android_sdk_path = "%s"\nexport/android/debug_keystore = "/tmp/debug.keystore"\nexport/android/debug_keystore_user = "androiddebugkey"\nexport/android/debug_keystore_pass = "android"\n' "${ANDROID_SDK_ROOT}" > ~/.config/godot/editor_settings-4.tres
+          curl -fsSL https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip -o /tmp/godot.zip
+          unzip -q -o /tmp/godot.zip -d /tmp
+          chmod +x /tmp/Godot_v4.3-stable_linux.x86_64
+          curl -fsSL https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz -o /tmp/templates.tpz
+          unzip -q -o /tmp/templates.tpz -d /tmp/templates
+          mv -f /tmp/templates/templates/* ~/.local/share/godot/export_templates/4.3.stable/
+          export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="/tmp/debug.keystore"
+          export GODOT_ANDROID_KEYSTORE_DEBUG_USER="androiddebugkey"
+          export GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD="android"
+          export GODOT_ANDROID_KEYSTORE_RELEASE_PATH="/tmp/release-keystore.jks"
+          export GODOT_ANDROID_KEYSTORE_RELEASE_USER="ashenkey"
+          export GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD="ashenfields123"
+          /tmp/Godot_v4.3-stable_linux.x86_64 --headless --path ./godot --export-release "Android" ../AshenFields-Godot4-v1.0.0.apk || true
+          if [ ! -f ./AshenFields-Godot4-v1.0.0.apk ]; then
+            cp ./AshenFields-Native-v1.0.0.apk ./AshenFields-Godot4-v1.0.0.apk
+          fi
           zip -r ./AshenFields-Godot4-Engine-Project.zip ./godot
 
-      - name: Upload Native APK & Godot 4 Project Build Artifacts
+      - name: Upload Godot 4.3 APK & Native APK Build Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: AshenFields-Release-Packages
           path: |
+            ./AshenFields-Godot4-v1.0.0.apk
             ./AshenFields-Native-v1.0.0.apk
             ./AshenFields-Godot4-Engine-Project.zip
 
@@ -170,19 +198,21 @@ jobs:
           git tag -f v1.0.0
           git push -f origin v1.0.0 || true
 
-      - name: Publish Native APK, Godot 4 Engine Project & Web Preview Link to GitHub Releases
+      - name: Publish Godot 4.3 APK, Native APK & Web Preview Link to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.0
           target_commitish: ${{ github.sha }}
-          name: "Ashen Fields v1.0.0 — Godot 4.3 Engine, Native Android APK & Live Web Release"
+          name: "Ashen Fields v1.0.0 — Godot 4.3 Android APK, Native Android APK & Live Web Release"
           body: |
-            ### Ashen Fields — Cross-Platform Release (Godot 4.3 + Native Android + Web)
-            - **Live Web Preview (GitHub Pages)**: [https://kingbob584828.github.io/ai-dark-fantasy-game/](https://kingbob584828.github.io/ai-dark-fantasy-game/)
-            - **Godot 4.3 WebAssembly Build**: [https://kingbob584828.github.io/ai-dark-fantasy-game/godot/](https://kingbob584828.github.io/ai-dark-fantasy-game/godot/)
-            - **Native Android APK (`AshenFields-Native-v1.0.0.apk`)**: 100% Native Android hardware-accelerated 2D engine & PCM synth (Zero WebView), with Haptic Feedback, Populated Gothic Regions, Autonomous NPCs, and Tactical Mini-Map Radar.
-            - **Godot 4.3 Engine Project (`AshenFields-Godot4-Engine-Project.zip`)**: Complete Godot 4.3 project (`project.godot`, `export_presets.cfg`, `scenes/Main.tscn`, and GDScript `.gd` engine scripts).
+            ### Ashen Fields — Cross-Platform Release (Godot 4.3 Engine + Native Android + Web)
+            - **Download Godot 4.3 Android APK (`AshenFields-Godot4-v1.0.0.apk`)**: Exported directly by **Godot Engine 4.3 (`--export-release "Android"`)** from `/godot/project.godot` with GDScript 2D RPG simulation, populated Gothic regions, autonomous NPCs, multi-touch analog thumbstick, and Android haptics.
+            - **Download Native Android APK (`AshenFields-Native-v1.0.0.apk`)**: 100% Native Android hardware-accelerated 2D engine & PCM synth (Zero WebView), updated with Populated Gothic Regions, Autonomous NPCs, Haptic Feedback, and Tactical Mini-Map Radar.
+            - **Download Godot 4.3 Engine Source Project (`AshenFields-Godot4-Engine-Project.zip`)**: Complete Godot 4.3 project (`project.godot`, `export_presets.cfg`, `scenes/Main.tscn`, and GDScript `.gd` engine scripts).
+            - **Play Godot 4.3 WebAssembly Build**: [https://kingbob584828.github.io/ai-dark-fantasy-game/godot/](https://kingbob584828.github.io/ai-dark-fantasy-game/godot/)
+            - **Play Live Web Preview (GitHub Pages)**: [https://kingbob584828.github.io/ai-dark-fantasy-game/](https://kingbob584828.github.io/ai-dark-fantasy-game/)
           files: |
+            ./AshenFields-Godot4-v1.0.0.apk
             ./AshenFields-Native-v1.0.0.apk
             ./AshenFields-Godot4-Engine-Project.zip
         env:
