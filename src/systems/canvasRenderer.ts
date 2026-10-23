@@ -1,3 +1,4 @@
+import Phaser from 'phaser';
 import {
   RegionDefinition,
   AutonomousNPC,
@@ -64,8 +65,8 @@ export interface PlayerRenderState {
   bloodSpotAsh: number;
 }
 
-// Snap helper for crisp pixel-cluster feel
-const px = (n: number) => Math.round(n / 2) * 2;
+// Snap helper using Phaser.Math for crisp pixel-cluster alignment
+const px = (n: number) => Phaser.Math.Snap.To(n, 2);
 
 // ==================== OFFSCREEN PIXEL-ART SPRITE CACHE ====================
 const spriteCache: Record<string, HTMLCanvasElement> = {};
@@ -135,7 +136,7 @@ const HERO_F1 = [
   '................',
 ];
 
-const NPC_GRID = [
+const NPC_GRID_F0 = [
   '.....OOOOOO.....',
   '....OCCCCCCCO...',
   '....OCCFFCCCO...',
@@ -150,6 +151,23 @@ const NPC_GRID = [
   '....OBB..BBO....',
   '....OBB..BBO....',
   '....OOO..OOO....',
+];
+
+const NPC_GRID_F1 = [
+  '.....OOOOOO.....',
+  '....OCCCCCCCO...',
+  '....OCCFFCCCO...',
+  '....OCCFFCCCO...',
+  '...OCCCCCCCCO...',
+  '..OCCAAAAAACC...',
+  '..OCCAGGGGACCO..',
+  '..OCCAAAAAACCO..',
+  '...OCCCCCCCCO...',
+  '..OCCCCCCCCCCO..',
+  '...OBB.OO.CCO...',
+  '...OOO....BBO...',
+  '..........OOO...',
+  '................',
 ];
 
 const STAG_GRID = [
@@ -237,7 +255,7 @@ export function renderGameWorld(
   ctx.fillStyle = region.ambientColor;
   ctx.fillRect(0, 0, viewportW, viewportH);
 
-  // Distant Parallax Architectural / Forest Horizon Silhouettes (Layer 0.25x)
+  // Distant Parallax Architectural / Forest Horizon Silhouettes (Layer 0.2x)
   ctx.save();
   ctx.fillStyle = 'rgba(10, 12, 18, 0.55)';
   const parallaxOffsetX = -(camX * 0.2) % 320;
@@ -257,15 +275,17 @@ export function renderGameWorld(
   ctx.fillRect(0, 0, region.width, region.height);
 
   const tileSize = 64;
-  const startCol = Math.max(0, Math.floor(camX / tileSize));
-  const endCol = Math.min(
-    Math.ceil(region.width / tileSize),
-    Math.ceil((camX + viewportW) / tileSize)
+  const startCol = Phaser.Math.Clamp(Math.floor(camX / tileSize), 0, Math.ceil(region.width / tileSize));
+  const endCol = Phaser.Math.Clamp(
+    Math.ceil((camX + viewportW) / tileSize),
+    0,
+    Math.ceil(region.width / tileSize)
   );
-  const startRow = Math.max(0, Math.floor(camY / tileSize));
-  const endRow = Math.min(
-    Math.ceil(region.height / tileSize),
-    Math.ceil((camY + viewportH) / tileSize)
+  const startRow = Phaser.Math.Clamp(Math.floor(camY / tileSize), 0, Math.ceil(region.height / tileSize));
+  const endRow = Phaser.Math.Clamp(
+    Math.ceil((camY + viewportH) / tileSize),
+    0,
+    Math.ceil(region.height / tileSize)
   );
 
   for (let r = startRow; r < endRow; r++) {
@@ -279,21 +299,105 @@ export function renderGameWorld(
         ctx.fillRect(tx + 2, ty + 2, tileSize - 4, tileSize - 4);
       }
 
-      if (hash < 45) {
+      if (hash < 55) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
         ctx.fillRect(tx + 12, ty + 18, 16, 4);
         ctx.fillRect(tx + 24, ty + 22, 4, 12);
-      } else if (hash > 210) {
+      } else if (hash > 195) {
         ctx.fillStyle =
           region.id === 'bramblewood'
-            ? 'rgba(16, 185, 129, 0.16)'
+            ? 'rgba(16, 185, 129, 0.18)'
             : region.id === 'cathedral'
-            ? 'rgba(99, 102, 241, 0.14)'
+            ? 'rgba(99, 102, 241, 0.16)'
+            : region.id === 'oakhaven'
+            ? 'rgba(120, 113, 108, 0.14)'
             : 'rgba(214, 211, 209, 0.08)';
-        ctx.fillRect(tx + 20, ty + 28, 12, 8);
-        ctx.fillRect(tx + 28, ty + 24, 8, 6);
+        ctx.fillRect(tx + 18, ty + 26, 14, 8);
+        ctx.fillRect(tx + 26, ty + 22, 8, 6);
       }
     }
+  }
+
+  // 2B. Ground-Layer Infrastructure Pass (Water Pools, Cobblestone Roads, Bridges)
+  for (const prop of region.props) {
+    if (
+      prop.type !== 'water_pool' &&
+      prop.type !== 'cobble_road' &&
+      prop.type !== 'bridge'
+    ) {
+      continue;
+    }
+    const x = px(prop.x - prop.width / 2);
+    const y = px(prop.y - prop.height / 2);
+    ctx.save();
+
+    if (prop.type === 'water_pool') {
+      const isLava = prop.subType === 'lava';
+      const isMire = prop.subType === 'mire';
+      ctx.fillStyle = isLava ? '#7f1d1d' : isMire ? '#064e3b' : '#0c4a6e';
+      ctx.fillRect(x, y, prop.width, prop.height);
+      ctx.fillStyle = isLava ? '#dc2626' : isMire ? '#047857' : '#0369a1';
+      ctx.fillRect(x + 6, y + 6, prop.width - 12, prop.height - 12);
+
+      // Animated surface ripples
+      const waveOffset = Math.sin(globalTime * 3 + prop.x * 0.05) * 6;
+      ctx.fillStyle = isLava
+        ? 'rgba(251, 191, 36, 0.45)'
+        : isMire
+        ? 'rgba(52, 211, 153, 0.25)'
+        : 'rgba(125, 211, 252, 0.25)';
+      for (let wx = x + 16; wx < x + prop.width - 24; wx += 44) {
+        for (let wy = y + 14; wy < y + prop.height - 16; wy += 28) {
+          ctx.fillRect(px(wx + waveOffset), wy, 18, 4);
+        }
+      }
+      ctx.strokeStyle = isLava ? '#b91c1c' : '#1e293b';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(x, y, prop.width, prop.height);
+    } else if (prop.type === 'cobble_road') {
+      ctx.fillStyle = '#292524';
+      ctx.fillRect(x, y, prop.width, prop.height);
+      ctx.strokeStyle = '#44403c';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x + 2, y + 2, prop.width - 4, prop.height - 4);
+
+      // Cobblestone pavers
+      for (let cx = x + 8; cx < x + prop.width - 16; cx += 28) {
+        for (let cy = y + 8; cy < y + prop.height - 12; cy += 20) {
+          const shift = ((cy / 20) | 0) % 2 === 0 ? 0 : 10;
+          ctx.fillStyle = (cx + cy) % 3 === 0 ? '#44403c' : '#3f3f46';
+          ctx.fillRect(cx + shift, cy, 18, 12);
+          ctx.fillStyle = '#1c1917';
+          ctx.fillRect(cx + shift, cy + 12, 18, 2);
+        }
+      }
+    } else if (prop.type === 'bridge') {
+      // Shadow under bridge
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+      ctx.fillRect(x + 4, y + 6, prop.width, prop.height);
+      // Timber planks & stone parapets
+      ctx.fillStyle = '#451a03';
+      ctx.fillRect(x, y, prop.width, prop.height);
+      ctx.fillStyle = '#78350f';
+      const horizontal = prop.width >= prop.height;
+      if (horizontal) {
+        for (let bx = x + 6; bx < x + prop.width - 6; bx += 14) {
+          ctx.fillRect(bx, y + 6, 10, prop.height - 12);
+        }
+        ctx.fillStyle = '#57534e';
+        ctx.fillRect(x, y, prop.width, 6);
+        ctx.fillRect(x, y + prop.height - 6, prop.width, 6);
+      } else {
+        for (let by = y + 6; by < y + prop.height - 6; by += 14) {
+          ctx.fillRect(x + 6, by, prop.width - 12, 10);
+        }
+        ctx.fillStyle = '#57534e';
+        ctx.fillRect(x, y, 6, prop.height);
+        ctx.fillRect(x + prop.width - 6, y, 6, prop.height);
+      }
+    }
+
+    ctx.restore();
   }
 
   // Outer Perimeter Stone Border Wall
@@ -392,13 +496,214 @@ export function renderGameWorld(
     ctx.restore();
   }
 
-  // 5. Props, Ruins, Trees, Traps, Shrines, Monoliths & Chests
+  // 5. Buildings, Fortifications, Forges, Harvest Nodes, Ruins, Trees, Traps, Shrines & Chests
   for (const prop of region.props) {
+    if (
+      prop.type === 'water_pool' ||
+      prop.type === 'cobble_road' ||
+      prop.type === 'bridge'
+    ) {
+      continue;
+    }
+
     ctx.save();
     const x = px(prop.x - prop.width / 2);
     const y = px(prop.y - prop.height / 2);
 
-    if (prop.type === 'bone_pyre_shrine') {
+    if (prop.type === 'building') {
+      // Drop shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+      ctx.fillRect(x + 10, y + 12, prop.width, prop.height);
+
+      // Stone foundation & lower walls
+      ctx.fillStyle = '#1c1917';
+      ctx.fillRect(x, y, prop.width, prop.height);
+      ctx.fillStyle = '#292524';
+      ctx.fillRect(x + 4, y + 4, prop.width - 8, prop.height - 8);
+
+      // Pitched Roof color by subType
+      const roofColor =
+        prop.subType === 'smithy'
+          ? '#7f1d1d'
+          : prop.subType === 'chapel'
+          ? '#1e1b4b'
+          : prop.subType === 'watchtower'
+          ? '#27272a'
+          : prop.subType === 'bazaar'
+          ? '#4c1d95'
+          : '#451a03';
+      const roofHighlight =
+        prop.subType === 'smithy'
+          ? '#991b1b'
+          : prop.subType === 'chapel'
+          ? '#312e81'
+          : prop.subType === 'watchtower'
+          ? '#3f3f46'
+          : prop.subType === 'bazaar'
+          ? '#6d28d9'
+          : '#78350f';
+
+      const roofH = Math.floor(prop.height * 0.58);
+      ctx.fillStyle = roofColor;
+      ctx.fillRect(x - 4, y - 6, prop.width + 8, roofH);
+      ctx.fillStyle = roofHighlight;
+      ctx.fillRect(x, y - 2, prop.width, 10);
+
+      // Roof shingle lines
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+      for (let ry = y + 10; ry < y - 6 + roofH; ry += 12) {
+        ctx.fillRect(x - 2, ry, prop.width + 4, 2);
+      }
+
+      // Timber beams & arched doorway on front facade
+      ctx.fillStyle = '#44403c';
+      ctx.fillRect(x + 8, y + roofH - 4, prop.width - 16, 4);
+
+      const doorW = 28;
+      const doorH = 34;
+      const doorX = prop.x - doorW / 2;
+      const doorY = y + prop.height - doorH;
+      ctx.fillStyle = '#09090b';
+      ctx.fillRect(doorX, doorY, doorW, doorH);
+      ctx.strokeStyle = '#57534e';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(doorX, doorY, doorW, doorH);
+
+      // Glowing stained glass / hearth windows
+      const winGlow =
+        prop.subType === 'chapel'
+          ? '#38bdf8'
+          : prop.subType === 'bazaar'
+          ? '#c084fc'
+          : '#fbbf24';
+      ctx.fillStyle = winGlow;
+      if (prop.width >= 150) {
+        ctx.fillRect(x + 22, y + roofH + 8, 18, 18);
+        ctx.fillRect(x + prop.width - 40, y + roofH + 8, 18, 18);
+        ctx.fillStyle = '#1c1917';
+        ctx.fillRect(x + 30, y + roofH + 8, 2, 18);
+        ctx.fillRect(x + prop.width - 32, y + roofH + 8, 2, 18);
+      } else {
+        ctx.fillRect(x + 16, y + roofH + 6, 14, 14);
+      }
+
+      // Smithy Chimney & Live Furnace Glow
+      if (prop.subType === 'smithy') {
+        ctx.fillStyle = '#27272a';
+        ctx.fillRect(x + prop.width - 36, y - 18, 22, 28);
+        const emberPulse = Math.sin(globalTime * 10) * 3;
+        ctx.fillStyle = '#f97316';
+        ctx.fillRect(x + prop.width - 32, y - 22 - emberPulse, 14, 8);
+      }
+
+      // Building Nameplate Banner
+      if (prop.loreTitle) {
+        ctx.font = '600 11px "Cinzel", serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(9, 9, 11, 0.78)';
+        const textW = ctx.measureText(prop.loreTitle).width + 14;
+        ctx.fillRect(prop.x - textW / 2, y - 24, textW, 16);
+        ctx.fillStyle = '#fde68a';
+        ctx.fillText(prop.loreTitle, prop.x, y - 12);
+      }
+    } else if (prop.type === 'stone_wall') {
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(x + 6, y + 8, prop.width, prop.height);
+      ctx.fillStyle = '#27272a';
+      ctx.fillRect(x, y, prop.width, prop.height);
+      ctx.strokeStyle = '#52525b';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x, y, prop.width, prop.height);
+      // Crenellations / Battlements
+      ctx.fillStyle = '#3f3f46';
+      if (prop.width >= prop.height) {
+        for (let bx = x + 4; bx < x + prop.width - 10; bx += 22) {
+          ctx.fillRect(bx, y - 4, 12, 8);
+        }
+      } else {
+        for (let by = y + 4; by < y + prop.height - 10; by += 22) {
+          ctx.fillRect(x - 4, by, 8, 12);
+        }
+      }
+    } else if (prop.type === 'anvil_forge') {
+      // Stone hearth base
+      ctx.fillStyle = '#1c1917';
+      ctx.fillRect(x, y, prop.width, prop.height);
+      ctx.strokeStyle = '#57534e';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x, y, prop.width, prop.height);
+      // Glowing forge coals
+      const glow = Math.sin(globalTime * 12) * 2;
+      ctx.fillStyle = '#ea580c';
+      ctx.fillRect(x + 6, y + 6, 18, prop.height - 12);
+      ctx.fillStyle = '#fef08a';
+      ctx.fillRect(x + 10, y + 10, 10 + glow, prop.height - 20);
+      // Star-Iron Anvil on right side
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillRect(prop.x + 2, prop.y - 6, 18, 12);
+      ctx.fillStyle = '#cbd5e1';
+      ctx.fillRect(prop.x - 2, prop.y - 8, 24, 6);
+    } else if (prop.type === 'harvest_node') {
+      const harvested = openedChests.includes(prop.id);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+      ctx.beginPath();
+      ctx.ellipse(prop.x, prop.y + 10, 18, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (harvested) {
+        ctx.fillStyle = '#44403c';
+        ctx.fillRect(prop.x - 10, prop.y + 2, 20, 8);
+      } else {
+        const pulse = Math.sin(globalTime * 5 + prop.x) * 3;
+        if (prop.subType === 'grain') {
+          ctx.fillStyle = '#d97706';
+          ctx.fillRect(prop.x - 12, prop.y - 14, 6, 24);
+          ctx.fillRect(prop.x - 2, prop.y - 18, 6, 28);
+          ctx.fillRect(prop.x + 8, prop.y - 12, 6, 22);
+          ctx.fillStyle = '#fef08a';
+          ctx.fillRect(prop.x - 12, prop.y - 16 - pulse * 0.4, 6, 8);
+          ctx.fillRect(prop.x - 2, prop.y - 20 - pulse * 0.4, 6, 8);
+          ctx.fillRect(prop.x + 8, prop.y - 14 - pulse * 0.4, 6, 8);
+        } else if (prop.subType === 'iron_vein') {
+          ctx.fillStyle = '#334155';
+          ctx.fillRect(prop.x - 16, prop.y - 8, 32, 20);
+          ctx.fillStyle = '#38bdf8';
+          ctx.fillRect(prop.x - 10, prop.y - 14 - pulse * 0.3, 8, 14);
+          ctx.fillRect(prop.x + 4, prop.y - 12 - pulse * 0.3, 8, 12);
+          ctx.fillStyle = '#e0f2fe';
+          ctx.fillRect(prop.x - 8, prop.y - 12, 4, 6);
+        } else if (prop.subType === 'spore') {
+          ctx.fillStyle = '#d6d3d1';
+          ctx.fillRect(prop.x - 8, prop.y - 4, 4, 14);
+          ctx.fillRect(prop.x + 4, prop.y - 6, 4, 16);
+          ctx.fillStyle = '#10b981';
+          ctx.fillRect(prop.x - 14, prop.y - 12 - pulse * 0.4, 16, 8);
+          ctx.fillRect(prop.x - 2, prop.y - 14 - pulse * 0.4, 16, 8);
+          ctx.fillStyle = '#a7f3d0';
+          ctx.fillRect(prop.x - 10, prop.y - 10, 4, 4);
+          ctx.fillRect(prop.x + 4, prop.y - 12, 4, 4);
+        } else if (prop.subType === 'moss') {
+          ctx.fillStyle = '#065f46';
+          ctx.fillRect(prop.x - 16, prop.y - 6, 32, 16);
+          ctx.fillStyle = '#34d399';
+          ctx.fillRect(prop.x - 12, prop.y - 10 - pulse * 0.3, 24, 10);
+        } else {
+          // bone_pile
+          ctx.fillStyle = '#a8a29e';
+          ctx.fillRect(prop.x - 14, prop.y - 6, 28, 14);
+          ctx.fillStyle = '#f5f5f4';
+          ctx.fillRect(prop.x - 6, prop.y - 12 - pulse * 0.3, 12, 10);
+        }
+      }
+    } else if (prop.type === 'grave_marker') {
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(x + 4, y + 6, prop.width, prop.height);
+      ctx.fillStyle = '#57534e';
+      ctx.fillRect(x + 4, y + 6, prop.width - 8, prop.height - 6);
+      ctx.fillStyle = '#78716c';
+      ctx.fillRect(prop.x - 3, y, 6, 18);
+      ctx.fillRect(prop.x - 8, y + 5, 16, 5);
+    } else if (prop.type === 'bone_pyre_shrine') {
       ctx.fillStyle = '#292524';
       ctx.fillRect(x, y + 16, prop.width, prop.height - 16);
       ctx.fillStyle = '#57534e';
@@ -621,11 +926,14 @@ export function renderGameWorld(
     ctx.restore();
   }
 
-  // 9. Autonomous NPCs (Pixel-Art Sprites)
+  // 9. Autonomous NPCs (Animated Pixel-Art Sprites + Overhead Speech Bubbles)
   for (const npc of npcs) {
     if (!npc.alive) continue;
     ctx.save();
-    const bob = Math.sin(globalTime * 4 + npc.x) * 2;
+    const isMoving = Math.hypot(npc.vx, npc.vy) > 4;
+    const animClock = npc.animTime ?? globalTime;
+    const bob = isMoving ? Math.sin(animClock * 10) * 2.5 : Math.sin(globalTime * 4 + npc.x) * 1.5;
+    const walkFrame = isMoving && Math.floor(animClock * 7) % 2 === 1 ? 1 : 0;
 
     ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
     ctx.beginPath();
@@ -633,8 +941,8 @@ export function renderGameWorld(
     ctx.fill();
 
     const npcSprite = bakePixelSprite(
-      `npc_${npc.id}_${npc.hitFlash > 0 ? 1 : 0}`,
-      NPC_GRID,
+      `npc_${npc.id}_f${walkFrame}_${npc.hitFlash > 0 ? 1 : 0}`,
+      walkFrame === 1 ? NPC_GRID_F1 : NPC_GRID_F0,
       {
         O: '#0c0e14',
         C: npc.hitFlash > 0 ? '#ffffff' : npc.colorCloak,
@@ -652,6 +960,14 @@ export function renderGameWorld(
       Math.round(npc.y - npcSprite.height / 2 + bob)
     );
 
+    // NPC Health Bar if damaged
+    if (npc.hp < npc.maxHp) {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+      ctx.fillRect(npc.x - 22, npc.y - 44, 44, 4);
+      ctx.fillStyle = '#34d399';
+      ctx.fillRect(npc.x - 22, npc.y - 44, 44 * Math.max(0, npc.hp / npc.maxHp), 4);
+    }
+
     ctx.font = '600 11px "Plus Jakarta Sans", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = npc.isCompanion ? '#34d399' : '#fde68a';
@@ -659,6 +975,28 @@ export function renderGameWorld(
     ctx.font = '500 9.5px "Plus Jakarta Sans", sans-serif';
     ctx.fillStyle = '#a8a29e';
     ctx.fillText(npc.currentAction, npc.x, npc.y - 23);
+
+    // Live Contextual Speech Bubble
+    if (npc.speechBubble && (npc.speechTimer ?? 0) > 0) {
+      ctx.font = '500 10px "Plus Jakarta Sans", sans-serif';
+      const bubbleText =
+        npc.speechBubble.length > 54
+          ? npc.speechBubble.slice(0, 52) + '…'
+          : npc.speechBubble;
+      const bw = Math.min(260, ctx.measureText(bubbleText).width + 16);
+      const bh = 20;
+      const bx = npc.x - bw / 2;
+      const by = npc.y - 62;
+
+      ctx.fillStyle = 'rgba(9, 9, 11, 0.92)';
+      ctx.fillRect(bx, by, bw, bh);
+      ctx.strokeStyle = npc.isCompanion ? '#10b981' : '#d97706';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(bx, by, bw, bh);
+
+      ctx.fillStyle = '#fafaf9';
+      ctx.fillText(bubbleText, npc.x, by + 13.5);
+    }
     ctx.restore();
   }
 
@@ -797,7 +1135,6 @@ export function renderGameWorld(
   ctx.fillStyle = pGlow;
   ctx.beginPath();
   ctx.arc(player.x, player.y, 190, 0, Math.PI * 2);
-  ctx.fill();
   ctx.restore();
 
   ctx.restore();
@@ -815,4 +1152,75 @@ export function renderGameWorld(
   vig.addColorStop(1, 'rgba(6, 7, 10, 0.62)');
   ctx.fillStyle = vig;
   ctx.fillRect(0, 0, viewportW, viewportH);
+
+  // 16. Screen-Space Tactical Region Mini-Map Radar (Top-Right below Region Header)
+  if (viewportW >= 360 && viewportH >= 320) {
+    const mapW = viewportW < 640 ? 96 : 128;
+    const mapH = Math.round(mapW * (region.height / region.width));
+    const mapX = viewportW - mapW - 12;
+    const mapY = viewportW < 640 ? 48 : 58;
+    const scaleX = mapW / region.width;
+    const scaleY = mapH / region.height;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(9, 9, 11, 0.82)';
+    ctx.fillRect(mapX, mapY, mapW, mapH);
+    ctx.strokeStyle = 'rgba(245, 158, 11, 0.45)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(mapX, mapY, mapW, mapH);
+
+    // Roads & Buildings on Mini-Map
+    for (const p of region.props) {
+      if (p.type === 'cobble_road' || p.type === 'bridge') {
+        ctx.fillStyle = 'rgba(120, 113, 108, 0.45)';
+        ctx.fillRect(
+          mapX + (p.x - p.width / 2) * scaleX,
+          mapY + (p.y - p.height / 2) * scaleY,
+          Math.max(2, p.width * scaleX),
+          Math.max(2, p.height * scaleY)
+        );
+      } else if (p.type === 'building') {
+        ctx.fillStyle = '#78350f';
+        ctx.fillRect(
+          mapX + (p.x - p.width / 2) * scaleX,
+          mapY + (p.y - p.height / 2) * scaleY,
+          Math.max(3, p.width * scaleX),
+          Math.max(3, p.height * scaleY)
+        );
+      } else if (p.type === 'bone_pyre_shrine') {
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillRect(mapX + p.x * scaleX - 2, mapY + p.y * scaleY - 2, 4, 4);
+      } else if (p.type === 'harvest_node' && !openedChests.includes(p.id)) {
+        ctx.fillStyle = '#10b981';
+        ctx.fillRect(mapX + p.x * scaleX - 1.5, mapY + p.y * scaleY - 1.5, 3, 3);
+      }
+    }
+
+    // Portals on Mini-Map
+    for (const portal of region.portals) {
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillRect(mapX + portal.x * scaleX - 2, mapY + portal.y * scaleY - 2, 4, 4);
+    }
+
+    // Hostile Creatures on Mini-Map
+    for (const c of creatures) {
+      if (c.hp <= 0) continue;
+      ctx.fillStyle = c.isBoss ? '#f43f5e' : c.role === 'prey' ? '#7dd3fc' : '#ef4444';
+      ctx.fillRect(mapX + c.x * scaleX - 1.5, mapY + c.y * scaleY - 1.5, 3, 3);
+    }
+
+    // Autonomous NPCs on Mini-Map
+    for (const npc of npcs) {
+      if (!npc.alive) continue;
+      ctx.fillStyle = npc.isCompanion ? '#34d399' : '#fde047';
+      ctx.fillRect(mapX + npc.x * scaleX - 2, mapY + npc.y * scaleY - 2, 4, 4);
+    }
+
+    // Player Position Dot
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(mapX + player.x * scaleX, mapY + player.y * scaleY, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
 }

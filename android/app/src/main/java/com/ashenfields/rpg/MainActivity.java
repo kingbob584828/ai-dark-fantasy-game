@@ -511,10 +511,14 @@ public class MainActivity extends Activity {
         String title;
         String regionId;
         float x, y;
+        float targetX, targetY;
         boolean alive = true;
         boolean isCompanion = false;
         String currentGoal;
         String currentAction;
+        String speechBubble = "";
+        float speechTimer = 0f;
+        float combatCooldown = 0f;
         int trust;
         String belief;
         String knownFact;
@@ -528,6 +532,8 @@ public class MainActivity extends Activity {
             this.regionId = regionId;
             this.x = x;
             this.y = y;
+            this.targetX = x;
+            this.targetY = y;
             this.currentGoal = currentGoal;
             this.currentAction = currentAction;
             this.trust = trust;
@@ -555,6 +561,8 @@ public class MainActivity extends Activity {
         boolean isBoss;
         int bossPhase = 1;
 
+        boolean deathProcessed = false;
+
         Creature(String name, String role, String regionId, float x, float y, float maxHp,
                  int damage, float speed, float attackRange, int ashReward, int color, float scale, boolean isBoss) {
             this.name = name;
@@ -576,15 +584,23 @@ public class MainActivity extends Activity {
 
     static class WorldProp {
         String regionId;
-        String type; // shrine, tree, chest
-        float x, y;
+        String type; // shrine, tree, chest, building, road, harvest
+        String label = "";
+        float x, y, w, h;
         boolean opened = false;
 
         WorldProp(String regionId, String type, float x, float y) {
+            this(regionId, type, x, y, 64f, 64f, "");
+        }
+
+        WorldProp(String regionId, String type, float x, float y, float w, float h, String label) {
             this.regionId = regionId;
             this.type = type;
             this.x = x;
             this.y = y;
+            this.w = w;
+            this.h = h;
+            this.label = label;
         }
     }
 
@@ -796,11 +812,27 @@ public class MainActivity extends Activity {
 
             props.clear();
             for (String rk : regionKeys) {
+                // Cobblestone Crossroads
+                props.add(new WorldProp(rk, "road", 720f, 480f, 1320f, 84f, ""));
+                props.add(new WorldProp(rk, "road", 680f, 460f, 92f, 760f, ""));
+                // Regional Gothic Buildings
+                if (rk.equals("oakhaven")) {
+                    props.add(new WorldProp(rk, "building", 340f, 250f, 220f, 140f, "Korvak's Star-Iron Smithy"));
+                    props.add(new WorldProp(rk, "building", 350f, 710f, 210f, 130f, "Sanctuary Granary"));
+                    props.add(new WorldProp(rk, "building", 880f, 240f, 180f, 130f, "North Garrison Tower"));
+                    props.add(new WorldProp(rk, "building", 1040f, 710f, 190f, 130f, "Crow's Perch Bazaar"));
+                } else {
+                    props.add(new WorldProp(rk, "building", 360f, 250f, 210f, 135f, "Ancient Sanctuary Keep"));
+                    props.add(new WorldProp(rk, "building", 1040f, 710f, 200f, 130f, "Ruined Outpost Hall"));
+                }
+                // Shrines, Chests, Harvestable Resource Nodes & Trees
                 props.add(new WorldProp(rk, "shrine", 680f, 460f));
                 props.add(new WorldProp(rk, "chest", 960f, 340f));
+                props.add(new WorldProp(rk, "harvest", 520f, 680f, 40f, 40f, "Harvest Star-Iron / Grain"));
+                props.add(new WorldProp(rk, "harvest", 860f, 640f, 40f, 40f, "Harvest Luminescent Spore"));
                 for (int i = 0; i < 8; i++) {
                     float tx = 180f + (i * 175f) % 1240f;
-                    float ty = (i % 2 == 0) ? 210f : 760f;
+                    float ty = (i % 2 == 0) ? 160f : 810f;
                     props.add(new WorldProp(rk, "tree", tx, ty));
                 }
             }
@@ -826,6 +858,7 @@ public class MainActivity extends Activity {
 
         private void resetCreatures() {
             creatures.clear();
+            creatures.add(new Creature("Ash-Stalker Hound", "predator", "oakhaven", 1240f, 520f, 95f, 18, 130f, 54f, 65, Color.rgb(153, 27, 27), 1.0f, false));
             creatures.add(new Creature("Ashen White-Stag", "prey", "bramblewood", 440f, 680f, 65f, 10, 125f, 45f, 45, Color.rgb(231, 229, 228), 1.0f, false));
             creatures.add(new Creature("Blight-Maw Hound", "predator", "bramblewood", 780f, 560f, 110f, 24, 145f, 58f, 80, Color.rgb(153, 27, 27), 1.0f, false));
             creatures.add(new Creature("Marrow-Gorged Ghoul", "scavenger", "bramblewood", 890f, 720f, 125f, 26, 122f, 56f, 90, Color.rgb(77, 124, 15), 1.05f, false));
@@ -992,6 +1025,9 @@ public class MainActivity extends Activity {
                 if (pr.type.equals("chest") && !pr.opened && Math.hypot(pr.x - playerX, pr.y - playerY) < 85f) {
                     return "Open Relic Chest";
                 }
+                if (pr.type.equals("harvest") && !pr.opened && Math.hypot(pr.x - playerX, pr.y - playerY) < 85f) {
+                    return pr.label.isEmpty() ? "Harvest Resource" : pr.label;
+                }
             }
             for (Corpse cp : corpses) {
                 if (!cp.scavenged && cp.regionId.equals(regionId) && Math.hypot(cp.x - playerX, cp.y - playerY) < 85f) {
@@ -1027,6 +1063,15 @@ public class MainActivity extends Activity {
                     ash += 150;
                     starIron += 2;
                     showToast("Opened Relic Chest (+150 Ash, +2 Star-Iron Shards)");
+                    SynthAudio.playParry();
+                    return;
+                }
+                if (pr.type.equals("harvest") && !pr.opened && Math.hypot(pr.x - playerX, pr.y - playerY) < 85f) {
+                    pr.opened = true;
+                    ash += 45;
+                    starIron += 1;
+                    settlementFood = Math.min(100f, settlementFood + 8f);
+                    showToast("Harvested Resource Node (+45 Ash, +1 Star-Iron, +Food)");
                     SynthAudio.playParry();
                     return;
                 }
@@ -1284,14 +1329,17 @@ public class MainActivity extends Activity {
                 }
             }
 
-            // Sworn Companion AI
-            for (NPC comp : npcs) {
-                if (!comp.alive || !comp.isCompanion || !comp.regionId.equals(regionId)) continue;
+            // Autonomous NPCs: Real-Time Combat Defense, Companion Follow, Waypoint Walking & Speech Bubbles
+            for (NPC npc : npcs) {
+                if (!npc.alive || !npc.regionId.equals(regionId)) continue;
+                if (npc.combatCooldown > 0f) npc.combatCooldown -= dt;
+                if (npc.speechTimer > 0f) npc.speechTimer -= dt;
+
                 Creature nearest = null;
-                float bestD = 250f;
+                float bestD = npc.isCompanion ? 260f : 230f;
                 for (Creature c : creatures) {
                     if (c.regionId.equals(regionId) && c.hp > 0f && !c.role.equals("prey")) {
-                        float d = (float) Math.hypot(c.x - comp.x, c.y - comp.y);
+                        float d = (float) Math.hypot(c.x - npc.x, c.y - npc.y);
                         if (d < bestD) {
                             bestD = d;
                             nearest = c;
@@ -1299,25 +1347,59 @@ public class MainActivity extends Activity {
                     }
                 }
                 if (nearest != null) {
-                    float ang = (float) Math.atan2(nearest.y - comp.y, nearest.x - comp.x);
+                    float ang = (float) Math.atan2(nearest.y - npc.y, nearest.x - npc.x);
                     if (bestD > 52f) {
-                        comp.x += (float) Math.cos(ang) * 145f * dt;
-                        comp.y += (float) Math.sin(ang) * 145f * dt;
-                    } else {
-                        nearest.hp -= 32f * dt;
+                        npc.x += (float) Math.cos(ang) * 140f * dt;
+                        npc.y += (float) Math.sin(ang) * 140f * dt;
+                    } else if (npc.combatCooldown <= 0f) {
+                        npc.combatCooldown = 1.0f;
+                        nearest.hp -= 36f;
+                        nearest.hitFlash = 0.15f;
+                        floatingTexts.add(new FloatingText(nearest.x, nearest.y - 24f, "-36", Color.rgb(253, 230, 138)));
+                        npc.speechBubble = "Back to the ash, " + nearest.name + "!";
+                        npc.speechTimer = 3.0f;
                     }
-                } else if (Math.hypot(playerX - comp.x, playerY - comp.y) > 72f) {
-                    float ang = (float) Math.atan2(playerY - comp.y, playerX - comp.x);
-                    comp.x += (float) Math.cos(ang) * 165f * dt;
-                    comp.y += (float) Math.sin(ang) * 165f * dt;
+                } else if (npc.isCompanion) {
+                    if (Math.hypot(playerX - npc.x, playerY - npc.y) > 72f) {
+                        float ang = (float) Math.atan2(playerY - npc.y, playerX - npc.x);
+                        npc.x += (float) Math.cos(ang) * 165f * dt;
+                        npc.y += (float) Math.sin(ang) * 165f * dt;
+                    }
+                } else {
+                    float dTarget = (float) Math.hypot(npc.targetX - npc.x, npc.targetY - npc.y);
+                    if (dTarget > 14f) {
+                        float ang = (float) Math.atan2(npc.targetY - npc.y, npc.targetX - npc.x);
+                        npc.x += (float) Math.cos(ang) * 72f * dt;
+                        npc.y += (float) Math.sin(ang) * 72f * dt;
+                    }
                 }
             }
 
-            // Autonomous Living World Macro Tick
+            // Process Creature Deaths from Melee, Spells, Projectiles, or NPCs
+            for (Creature c : creatures) {
+                if (c.hp <= 0f && !c.deathProcessed) {
+                    c.deathProcessed = true;
+                    ash += c.ashReward;
+                    corpses.add(new Corpse(c.regionId, c.x, c.y, "Remains of " + c.name, Math.max(20, c.ashReward / 3)));
+                    showToast("Felled " + c.name + " (+" + c.ashReward + " Ash)");
+                    if (c.isBoss) {
+                        screenState = "VICTORY";
+                    }
+                }
+            }
+
+            // Autonomous Living World Macro Tick (NPC Patrol Waypoints + Speech Bubbles)
             aiTickAccum += dt;
-            if (aiTickAccum >= 8f) {
+            if (aiTickAccum >= 6.5f) {
                 aiTickAccum = 0f;
-                settlementFood = Math.max(12f, Math.min(100f, settlementFood - 1.2f));
+                settlementFood = Math.max(12f, Math.min(100f, settlementFood - 1.0f));
+                for (NPC n : npcs) {
+                    if (!n.alive || n.isCompanion) continue;
+                    n.targetX = 280f + rng.nextFloat() * 820f;
+                    n.targetY = 240f + rng.nextFloat() * 440f;
+                    n.speechBubble = n.belief;
+                    n.speechTimer = 4.2f;
+                }
                 if (settlementFood < 40f) {
                     for (NPC n : npcs) {
                         if (n.id.equals("verenice") && n.regionId.equals("oakhaven")) {
@@ -1421,12 +1503,37 @@ public class MainActivity extends Activity {
                 paint.setShader(null);
             }
 
-            // 5. Environment Props (Shrines, Blight Trees, Relic Chests) & Dynamic Torchlight
+            // 5. Environment Props (Cobblestone Roads, Gothic Buildings, Shrines, Harvest Nodes, Trees, Relic Chests)
             for (WorldProp pr : props) {
                 if (!pr.regionId.equals(regionId)) continue;
                 float px = pr.x - camX;
                 float py = pr.y - camY;
-                if (pr.type.equals("shrine")) {
+                if (pr.type.equals("road")) {
+                    paint.setColor(Color.rgb(41, 37, 36));
+                    canvas.drawRect(px - pr.w / 2f, py - pr.h / 2f, px + pr.w / 2f, py + pr.h / 2f, paint);
+                } else if (pr.type.equals("building")) {
+                    float bx = px - pr.w / 2f;
+                    float by = py - pr.h / 2f;
+                    paint.setColor(Color.argb(150, 0, 0, 0));
+                    canvas.drawRect(bx + 8f, by + 10f, bx + pr.w + 8f, by + pr.h + 10f, paint);
+                    paint.setColor(Color.rgb(28, 25, 23));
+                    canvas.drawRect(bx, by, bx + pr.w, by + pr.h, paint);
+                    paint.setColor(Color.rgb(127, 29, 29));
+                    canvas.drawRect(bx - 4f, by - 4f, bx + pr.w + 4f, by + pr.h * 0.56f, paint);
+                    paint.setColor(Color.rgb(251, 191, 36));
+                    canvas.drawRect(bx + 20f, by + pr.h * 0.62f, bx + 36f, by + pr.h * 0.62f + 16f, paint);
+                    canvas.drawRect(bx + pr.w - 36f, by + pr.h * 0.62f, bx + pr.w - 20f, by + pr.h * 0.62f + 16f, paint);
+                    if (!pr.label.isEmpty()) {
+                        paint.setColor(Color.rgb(253, 230, 138));
+                        paint.setTextSize(10f);
+                        paint.setTypeface(Typeface.SERIF);
+                        paint.setTextAlign(Paint.Align.CENTER);
+                        canvas.drawText(pr.label, px, by - 10f, paint);
+                    }
+                } else if (pr.type.equals("harvest") && !pr.opened) {
+                    paint.setColor(Color.rgb(16, 185, 129));
+                    canvas.drawCircle(px, py, 12f + (float) Math.sin(globalTime * 5f) * 2f, paint);
+                } else if (pr.type.equals("shrine")) {
                     float flicker = (float) Math.sin(globalTime * 9f) * 14f;
                     paint.setShader(new RadialGradient(
                             px, py, 190f + flicker,
@@ -1527,6 +1634,16 @@ public class MainActivity extends Activity {
                 paint.setTypeface(Typeface.DEFAULT_BOLD);
                 paint.setTextAlign(Paint.Align.CENTER);
                 canvas.drawText(n.name, nx, ny - 29f, paint);
+
+                if (n.speechTimer > 0f && n.speechBubble != null && !n.speechBubble.isEmpty()) {
+                    paint.setTextSize(9.5f);
+                    String line = fitText(n.speechBubble, 180f, paint);
+                    float tw = paint.measureText(line) + 14f;
+                    paint.setColor(Color.argb(220, 9, 10, 15));
+                    canvas.drawRect(nx - tw / 2f, ny - 54f, nx + tw / 2f, ny - 36f, paint);
+                    paint.setColor(Color.rgb(250, 250, 249));
+                    canvas.drawText(line, nx, ny - 41f, paint);
+                }
             }
 
             // 9. Projectiles

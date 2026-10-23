@@ -257,6 +257,7 @@ export interface CreatureEntity {
   hitFlash: number;
   animTime: number;
   attackPatternIndex?: number;
+  deathProcessed?: boolean;
 }
 
 export interface CorpseEntity {
@@ -339,6 +340,13 @@ export interface AutonomousNPC {
   lastDecisionTick: number;
   hitFlash: number;
   combatCooldown: number;
+  // Live Autonomous Navigation & Speech Bubble State
+  targetX?: number;
+  targetY?: number;
+  speechBubble?: string;
+  speechTimer?: number;
+  workTimer?: number;
+  animTime?: number;
 }
 
 export interface WorldEventRecord {
@@ -398,7 +406,15 @@ export interface RegionProp {
     | 'bone_pyre_shrine'
     | 'lore_monolith'
     | 'treasure_chest'
-    | 'shortcut_gate';
+    | 'shortcut_gate'
+    | 'building'
+    | 'cobble_road'
+    | 'stone_wall'
+    | 'harvest_node'
+    | 'anvil_forge'
+    | 'grave_marker'
+    | 'water_pool'
+    | 'bridge';
   x: number;
   y: number;
   width: number;
@@ -406,9 +422,12 @@ export interface RegionProp {
   solid: boolean;
   interactable?: boolean;
   label?: string;
+  subType?: string;
   loreTitle?: string;
   loreText?: string;
   chestLootIds?: string[];
+  harvestItemId?: string;
+  harvestAsh?: number;
   opened?: boolean;
   shortcutId?: string;
   lightColor?: string;

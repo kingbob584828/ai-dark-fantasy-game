@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import Phaser from 'phaser';
 import {
   ActiveModalTab,
   Attributes,
@@ -448,6 +449,53 @@ export default function App() {
     []
   );
 
+  const processCreatureDeaths = useCallback(() => {
+    const eng = engineRef.current;
+    const p = eng.player;
+    for (const c of eng.creatures) {
+      if (c.hp <= 0 && !c.deathProcessed) {
+        c.deathProcessed = true;
+        spawnParticles(c.x, c.y, c.isBoss ? 48 : 20, '#be123c', 160, 5);
+        setAsh((prev) => prev + c.ashReward);
+        addFloatingText(c.x, c.y - 28, `+${c.ashReward} ASH`, '#fbbf24', true);
+
+        // Talisman of the Weeping Martyr passive
+        if (eng.equipped.talisman?.id === 'eq_talisman_blood_chalice') {
+          p.hp = Math.min(p.maxHp, p.hp + 12);
+        }
+
+        // Spawn CorpseEntity for Scavengers & Player Looting!
+        eng.corpses.push({
+          id: `corpse_${c.id}_${Date.now()}_${Math.random()}`,
+          name: `Remains of ${c.name}`,
+          regionId: c.regionId,
+          x: c.x,
+          y: c.y,
+          ashValue: Math.round(c.ashReward * 0.45),
+          lootItemIds: c.lootTable.slice(0, 2),
+          scavenged: false,
+          createdAt: eng.globalTime,
+        });
+
+        if (c.isBoss) {
+          setQuests((prev) =>
+            prev.map((q) =>
+              q.id === 'q_hollowed_seraph'
+                ? {
+                    ...q,
+                    status: 'completed',
+                    outcome: 'Malakor, the Hollowed Seraph was laid to rest.',
+                    stages: q.stages.map((s) => ({ ...s, completed: true })),
+                  }
+                : q
+            )
+          );
+          setTimeout(() => setScreenState('VICTORY'), 1200);
+        }
+      }
+    }
+  }, []);
+
   // ==================== CORE COMBAT & INTERACTION ACTIONS ====================
   const triggerPlayerAttack = useCallback((heavy: boolean) => {
     const eng = engineRef.current;
@@ -611,8 +659,9 @@ export default function App() {
       triggerHapticFeedback(heavy || isUmbralAmbush ? 'hit_heavy' : 'hit_light');
       eng.hitstopTimer = heavy || isUmbralAmbush ? 0.065 : 0.035;
       eng.shakeIntensity = heavy || isUmbralAmbush ? 7 : 3.5;
+      processCreatureDeaths();
     }
-  }, [triggerHapticFeedback]);
+  }, [triggerHapticFeedback, processCreatureDeaths]);
 
   const triggerPlayerDodge = useCallback(() => {
     const eng = engineRef.current;
@@ -808,7 +857,8 @@ export default function App() {
       );
       audioEngine.playSpellCast(spell.school, triggeredBloodSynergy);
     }
-  }, []);
+    processCreatureDeaths();
+  }, [triggerHapticFeedback, processCreatureDeaths]);
 
   const triggerQuickHeal = useCallback(() => {
     const flask = inventory.find((i) => i.id === 'item_ashen_flask' && i.quantity > 0);
@@ -994,6 +1044,42 @@ export default function App() {
             showBanner('COUNTERWEIGHT GATE UNLOCKED: Oakhaven Crypt Shortcut Open');
           }
           return;
+        } else if (prop.type === 'anvil_forge') {
+          audioEngine.playParryClang();
+          setActiveModal('crafting');
+          return;
+        } else if (prop.type === 'harvest_node') {
+          if (!eng.worldState.openedChests.includes(prop.id)) {
+            const nextOpened = [...eng.worldState.openedChests, prop.id];
+            const bonusAsh = prop.harvestAsh || 25;
+            const itemId = prop.harvestItemId || 'mat_star_iron_shard';
+            const tmpl = ITEMS_CATALOG[itemId];
+
+            setWorldState((prev) => ({
+              ...prev,
+              openedChests: nextOpened,
+              settlementFood:
+                itemId === 'mat_untainted_grain'
+                  ? Math.min(100, prev.settlementFood + 6)
+                  : prev.settlementFood,
+            }));
+            setAsh((prev) => prev + bonusAsh);
+            if (tmpl) {
+              setInventory((prev) => {
+                const next = [...prev];
+                const ex = next.find((i) => i.id === itemId && i.stackable);
+                if (ex) ex.quantity += 1;
+                else next.push(cloneItem(itemId, 1));
+                return next;
+              });
+            }
+            spawnParticles(prop.x, prop.y, 14, '#10b981', 80, 4);
+            audioEngine.playShrineChime();
+            showBanner(
+              `Harvested ${tmpl ? tmpl.name : 'Resource'} (+${bonusAsh} Ash)`
+            );
+            return;
+          }
         }
       }
     }
@@ -1261,9 +1347,9 @@ export default function App() {
             p.vy = my * baseMoveSpeed;
           }
 
-          // Apply velocity & prop collision
-          let nextX = Math.max(28, Math.min(reg.width - 28, p.x + p.vx * dt));
-          let nextY = Math.max(28, Math.min(reg.height - 28, p.y + p.vy * dt));
+          // Apply velocity & Phaser AABB circle push-out collision
+          let nextX = Phaser.Math.Clamp(p.x + p.vx * dt, 28, reg.width - 28);
+          let nextY = Phaser.Math.Clamp(p.y + p.vy * dt, 28, reg.height - 28);
 
           for (const prop of reg.props) {
             if (!prop.solid) {
@@ -1286,16 +1372,23 @@ export default function App() {
               }
               continue;
             }
-            const halfW = prop.width / 2 + 14;
-            const halfH = prop.height / 2 + 14;
-            if (Math.abs(nextX - prop.x) < halfW && Math.abs(nextY - prop.y) < halfH) {
-              if (Math.abs(p.x - prop.x) >= halfW) nextX = p.x;
-              if (Math.abs(p.y - prop.y) >= halfH) nextY = p.y;
+            const halfW = prop.width / 2 + 15;
+            const halfH = prop.height / 2 + 15;
+            const dx = nextX - prop.x;
+            const dy = nextY - prop.y;
+            if (Math.abs(dx) < halfW && Math.abs(dy) < halfH) {
+              const overlapX = halfW - Math.abs(dx);
+              const overlapY = halfH - Math.abs(dy);
+              if (overlapX < overlapY) {
+                nextX += dx >= 0 ? overlapX : -overlapX;
+              } else {
+                nextY += dy >= 0 ? overlapY : -overlapY;
+              }
             }
           }
 
-          p.x = nextX;
-          p.y = nextY;
+          p.x = Phaser.Math.Clamp(nextX, 28, reg.width - 28);
+          p.y = Phaser.Math.Clamp(nextY, 28, reg.height - 28);
 
           if (mag > 0.1 && p.dodgeTimer <= 0) {
             p.footstepTimer -= dt;
@@ -1529,43 +1622,7 @@ export default function App() {
 
             // Check Creature Death
             if (c.hp <= 0) {
-              spawnParticles(c.x, c.y, c.isBoss ? 45 : 18, '#be123c', 150, 5);
-              setAsh((prev) => prev + c.ashReward);
-              addFloatingText(c.x, c.y - 28, `+${c.ashReward} ASH`, '#fbbf24', true);
-
-              // Talisman of the Weeping Martyr passive
-              if (eng.equipped.talisman?.id === 'eq_talisman_blood_chalice') {
-                p.hp = Math.min(p.maxHp, p.hp + 12);
-              }
-
-              // Spawn CorpseEntity for Scavengers & Player Looting!
-              eng.corpses.push({
-                id: `corpse_${c.id}_${Date.now()}`,
-                name: `Remains of ${c.name}`,
-                regionId: eng.regionId,
-                x: c.x,
-                y: c.y,
-                ashValue: Math.round(c.ashReward * 0.35),
-                lootItemIds: c.lootTable.slice(0, 1),
-                scavenged: false,
-                createdAt: eng.globalTime,
-              });
-
-              if (c.isBoss) {
-                setQuests((prev) =>
-                  prev.map((q) =>
-                    q.id === 'q_hollowed_seraph'
-                      ? {
-                          ...q,
-                          status: 'completed',
-                          outcome: 'Malakor, the Hollowed Seraph was laid to rest.',
-                          stages: q.stages.map((s) => ({ ...s, completed: true })),
-                        }
-                      : q
-                  )
-                );
-                setTimeout(() => setScreenState('VICTORY'), 1200);
-              }
+              processCreatureDeaths();
               continue;
             }
 
@@ -1787,22 +1844,31 @@ export default function App() {
             }
           }
 
-          // ==================== AUTONOMOUS NPC LOCAL MOVEMENT & COMPANION COMBAT ====================
+          // ==================== AUTONOMOUS NPC REAL-TIME MOVEMENT, WORK, SPEECH & COMBAT ====================
           for (const npc of eng.npcs) {
             if (!npc.alive || npc.regionId !== eng.regionId) continue;
+            npc.animTime = (npc.animTime || 0) + dt;
             if (npc.combatCooldown > 0) npc.combatCooldown -= dt;
+            if (npc.hitFlash > 0) npc.hitFlash -= dt;
+            if ((npc.speechTimer ?? 0) > 0) {
+              npc.speechTimer = Math.max(0, (npc.speechTimer ?? 0) - dt);
+            }
 
-            // If Korvak is hunting Vane in Oakhaven!
+            // 1. If Korvak is hunting Vane in Oakhaven!
             if (npc.id === 'npc_korvak' && npc.currentGoal === 'hunt_rival') {
               const vane = eng.npcs.find((n) => n.id === 'npc_vane' && n.alive && n.regionId === eng.regionId);
               if (vane) {
-                const dVane = Math.hypot(vane.x - npc.x, vane.y - npc.y);
-                const ang = Math.atan2(vane.y - npc.y, vane.x - npc.x);
+                const dVane = Phaser.Math.Distance.Between(npc.x, npc.y, vane.x, vane.y);
+                const ang = Phaser.Math.Angle.Between(npc.x, npc.y, vane.x, vane.y);
                 npc.facing = ang;
                 if (dVane > 42) {
-                  npc.x += Math.cos(ang) * 135 * dt;
-                  npc.y += Math.sin(ang) * 135 * dt;
+                  npc.vx = Math.cos(ang) * 135;
+                  npc.vy = Math.sin(ang) * 135;
+                  npc.x += npc.vx * dt;
+                  npc.y += npc.vy * dt;
                 } else if (npc.combatCooldown <= 0) {
+                  npc.vx = 0;
+                  npc.vy = 0;
                   npc.combatCooldown = 1.1;
                   vane.hp -= 55;
                   vane.hitFlash = 0.2;
@@ -1815,57 +1881,126 @@ export default function App() {
                     showBanner('KORVAK SLEW VANE THE CROW-TONGUE FOR HIS BETRAYAL');
                   }
                 }
+                continue;
               }
             }
 
-            // Companion AI (e.g. Sir Gideon of the Ash fighting alongside player)
-            if (npc.isCompanion) {
-              let nearestEnemy: CreatureEntity | null = null;
-              let nearestDist = 260;
-              for (const c of eng.creatures) {
-                if (c.regionId === eng.regionId && c.hp > 0 && c.role !== 'prey') {
-                  const d = Math.hypot(c.x - npc.x, c.y - npc.y);
-                  if (d < nearestDist) {
-                    nearestDist = d;
-                    nearestEnemy = c;
-                  }
-                }
+            // 2. Active NPC Defense & Combat: ALL NPCs defend themselves and the settlement against nearby hostile creatures!
+            let nearestHostile: CreatureEntity | null = null;
+            let nearestHostileDist = npc.isCompanion ? 280 : 230;
+            for (const c of eng.creatures) {
+              if (c.regionId !== eng.regionId || c.hp <= 0 || c.role === 'prey') continue;
+              // Umbral Synod NPCs don't attack Umbral Synod creatures unless attacked
+              if (npc.faction === 'umbral_synod' && c.faction === 'umbral_synod' && !npc.isCompanion) {
+                continue;
               }
+              const d = Phaser.Math.Distance.Between(npc.x, npc.y, c.x, c.y);
+              if (d < nearestHostileDist) {
+                nearestHostileDist = d;
+                nearestHostile = c;
+              }
+            }
 
-              if (nearestEnemy) {
-                const ang = Math.atan2(nearestEnemy.y - npc.y, nearestEnemy.x - npc.x);
-                npc.facing = ang;
-                if (nearestDist > 56) {
-                  npc.x += Math.cos(ang) * 148 * dt;
-                  npc.y += Math.sin(ang) * 148 * dt;
-                } else if (npc.combatCooldown <= 0) {
+            if (nearestHostile) {
+              const ang = Phaser.Math.Angle.Between(npc.x, npc.y, nearestHostile.x, nearestHostile.y);
+              npc.facing = ang;
+              if (nearestHostileDist > 54) {
+                const spd = npc.isCompanion ? 152 : 120;
+                npc.vx = Math.cos(ang) * spd;
+                npc.vy = Math.sin(ang) * spd;
+                npc.x += npc.vx * dt;
+                npc.y += npc.vy * dt;
+              } else {
+                npc.vx = 0;
+                npc.vy = 0;
+                if (npc.combatCooldown <= 0) {
                   npc.combatCooldown = 1.05;
-                  nearestEnemy.hp -= 38;
-                  nearestEnemy.poise -= 22;
-                  nearestEnemy.hitFlash = 0.15;
+                  const npcDmg = npc.id === 'npc_korvak' || npc.id === 'npc_vael' ? 42 : 34;
+                  nearestHostile.hp -= npcDmg;
+                  nearestHostile.poise -= 22;
+                  nearestHostile.hitFlash = 0.15;
                   eng.slashes.push({
                     x: npc.x,
                     y: npc.y,
                     angle: ang,
                     arc: 1.4,
                     radius: 52,
-                    color: '#fbbf24',
+                    color: npc.colorAccent || '#fbbf24',
                     life: 0.18,
                     maxLife: 0.18,
                   });
-                  addFloatingText(nearestEnemy.x, nearestEnemy.y - 20, '38', '#fde68a');
+                  spawnParticles(nearestHostile.x, nearestHostile.y, 6, '#be123c', 90, 3);
+                  addFloatingText(nearestHostile.x, nearestHostile.y - 20, `${npcDmg}`, '#fde68a');
+                  if ((npc.speechTimer ?? 0) <= 0) {
+                    npc.speechBubble = `Back to the ash, ${nearestHostile.name}!`;
+                    npc.speechTimer = 3.0;
+                  }
                 }
+              }
+              continue;
+            }
+
+            // 3. Companion Follow Behavior
+            if (npc.isCompanion) {
+              const dPlayer = Phaser.Math.Distance.Between(npc.x, npc.y, p.x, p.y);
+              if (dPlayer > 72) {
+                const ang = Phaser.Math.Angle.Between(npc.x, npc.y, p.x, p.y);
+                npc.facing = ang;
+                npc.vx = Math.cos(ang) * 165;
+                npc.vy = Math.sin(ang) * 165;
+                npc.x += npc.vx * dt;
+                npc.y += npc.vy * dt;
               } else {
-                const dPlayer = Math.hypot(p.x - npc.x, p.y - npc.y);
-                if (dPlayer > 76) {
-                  const ang = Math.atan2(p.y - npc.y, p.x - npc.x);
-                  npc.facing = ang;
-                  npc.x += Math.cos(ang) * 165 * dt;
-                  npc.y += Math.sin(ang) * 165 * dt;
+                npc.vx = 0;
+                npc.vy = 0;
+              }
+              continue;
+            }
+
+            // 4. Autonomous Waypoint Walking & Workstation Animations
+            const tx = npc.targetX ?? npc.x;
+            const ty = npc.targetY ?? npc.y;
+            const dTarget = Phaser.Math.Distance.Between(npc.x, npc.y, tx, ty);
+            if (dTarget > 14) {
+              const ang = Phaser.Math.Angle.Between(npc.x, npc.y, tx, ty);
+              npc.facing = ang;
+              const walkSpd = 74;
+              npc.vx = Math.cos(ang) * walkSpd;
+              npc.vy = Math.sin(ang) * walkSpd;
+              let nx = Phaser.Math.Clamp(npc.x + npc.vx * dt, 36, reg.width - 36);
+              let ny = Phaser.Math.Clamp(npc.y + npc.vy * dt, 36, reg.height - 36);
+
+              for (const prop of reg.props) {
+                if (!prop.solid) continue;
+                const hw = prop.width / 2 + 12;
+                const hh = prop.height / 2 + 12;
+                if (Math.abs(nx - prop.x) < hw && Math.abs(ny - prop.y) < hh) {
+                  if (Math.abs(npc.x - prop.x) >= hw) nx = npc.x;
+                  if (Math.abs(npc.y - prop.y) >= hh) ny = npc.y;
+                }
+              }
+              npc.x = nx;
+              npc.y = ny;
+            } else {
+              npc.vx = 0;
+              npc.vy = 0;
+              npc.workTimer = (npc.workTimer || 0) + dt;
+              // Emit craft/work particles periodically at workstation
+              if (npc.workTimer >= 1.4) {
+                npc.workTimer = 0;
+                if (npc.id === 'npc_korvak') {
+                  spawnParticles(npc.x + 14, npc.y - 6, 6, '#f97316', 65, 3);
+                } else if (npc.id === 'npc_lyra') {
+                  spawnParticles(npc.x, npc.y, 4, '#34d399', 45, 3);
+                } else if (npc.id === 'npc_verenice') {
+                  spawnParticles(npc.x, npc.y - 8, 4, '#fbbf24', 45, 3);
                 }
               }
             }
           }
+
+          // Process any creature deaths caused by DoTs, Spell Zones, Projectiles, or NPCs this frame
+          processCreatureDeaths();
 
           // Check Player Death & Recoverable Bloodstain
           if (p.hp <= 0) {
@@ -2041,7 +2176,14 @@ export default function App() {
           }
           if (!interactPrompt) {
             for (const prop of reg.props) {
-              if (prop.interactable && Math.hypot(p.x - prop.x, p.y - prop.y) < 88) {
+              if (!prop.interactable) continue;
+              if (
+                (prop.type === 'treasure_chest' || prop.type === 'harvest_node') &&
+                eng.worldState.openedChests.includes(prop.id)
+              ) {
+                continue;
+              }
+              if (Math.hypot(p.x - prop.x, p.y - prop.y) < 88) {
                 interactPrompt = prop.label || 'Interact';
                 break;
               }
@@ -2091,6 +2233,7 @@ export default function App() {
     triggerCastSpell,
     triggerQuickHeal,
     triggerInteract,
+    processCreatureDeaths,
     showBanner,
   ]);
 
@@ -2186,7 +2329,15 @@ export default function App() {
 
   const handleQuestDecision = (actionId: string) => {
     if (actionId === 'donate_grain_verenice') {
-      setInventory((prev) => prev.filter((i) => i.id !== 'mat_settlement_grain'));
+      setInventory((prev) =>
+        prev
+          .map((i) =>
+            i.id === 'mat_untainted_grain' || i.id === 'mat_settlement_grain'
+              ? { ...i, quantity: i.quantity - 1 }
+              : i
+          )
+          .filter((i) => i.quantity > 0)
+      );
       setWorldState((prev) => ({
         ...prev,
         settlementFood: Math.min(100, prev.settlementFood + 35),
@@ -2207,6 +2358,23 @@ export default function App() {
         )
       );
       showBanner('OAKHAVEN GRANARIES RESTORED (+35% FOOD, +220 ASH)');
+    } else if (actionId === 'service_verenice_blessing') {
+      const p = engineRef.current.player;
+      p.hp = p.maxHp;
+      p.mana = p.maxMana;
+      p.stamina = p.maxStamina;
+      p.damageBuffTimer = 45;
+      audioEngine.playShrineChime();
+      showBanner('EMBER BLESSING BESTOWED: FULL VITALITY & +25% DAMAGE (45S)');
+    } else if (actionId === 'service_korvak_forge') {
+      audioEngine.playParryClang();
+      setActiveModal('crafting');
+    } else if (actionId === 'service_malrik_insight') {
+      const p = engineRef.current.player;
+      p.mana = p.maxMana;
+      p.umbralVeilTimer = 12;
+      audioEngine.playSpellCast('umbral', false);
+      showBanner('UMBRAL SHROUD ATTUNED: FULL MANA & PHANTOM VEIL (12S)');
     } else if (actionId === 'give_chalice_verenice') {
       setInventory((prev) => prev.filter((i) => i.id !== 'relic_first_choir_chalice'));
       setWorldState((prev) => ({
@@ -2724,65 +2892,64 @@ export default function App() {
           {/* PINNED BOTTOM-LEFT MOVEMENT PAD & PINNED BOTTOM-RIGHT ACTION CLUSTER */}
           {inputMode === 'touch' && (
             <>
-              {/* Bottom-Left: Dedicated Left-Hand Movement Pad (D-Pad + Analog Center) */}
-              <div className="pointer-events-auto fixed bottom-4 left-4 z-30 flex flex-col items-center">
-                <div className="grid grid-cols-3 gap-1.5 w-36 h-36 sm:w-40 sm:h-40 bg-[#11131a]/88 p-2.5 rounded-full border-2 border-[#443c2e] shadow-2xl">
+              {/* Bottom-Left: Dedicated Left-Hand Movement Pad (8-Way Analog Pointer + D-Pad) */}
+              <div className="pointer-events-auto fixed bottom-4 left-4 z-30 flex flex-col items-center select-none touch-none">
+                <div
+                  onPointerDown={(e) => {
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const dx = e.clientX - (rect.left + rect.width / 2);
+                    const dy = e.clientY - (rect.top + rect.height / 2);
+                    const dist = Math.hypot(dx, dy);
+                    if (dist > 8) {
+                      engineRef.current.touchMoveX = dx / dist;
+                      engineRef.current.touchMoveY = dy / dist;
+                    }
+                  }}
+                  onPointerMove={(e) => {
+                    if (e.buttons === 0 && e.pressure === 0) return;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const dx = e.clientX - (rect.left + rect.width / 2);
+                    const dy = e.clientY - (rect.top + rect.height / 2);
+                    const dist = Math.hypot(dx, dy);
+                    if (dist > 8) {
+                      engineRef.current.touchMoveX = dx / dist;
+                      engineRef.current.touchMoveY = dy / dist;
+                    } else {
+                      engineRef.current.touchMoveX = 0;
+                      engineRef.current.touchMoveY = 0;
+                    }
+                  }}
+                  onPointerUp={() => {
+                    engineRef.current.touchMoveX = 0;
+                    engineRef.current.touchMoveY = 0;
+                  }}
+                  onPointerCancel={() => {
+                    engineRef.current.touchMoveX = 0;
+                    engineRef.current.touchMoveY = 0;
+                  }}
+                  className="grid grid-cols-3 gap-1.5 w-36 h-36 sm:w-40 sm:h-40 bg-[#11131a]/90 p-2.5 rounded-full border-2 border-[#443c2e] shadow-2xl cursor-pointer"
+                >
                   <div />
-                  <button
-                    onTouchStart={(e) => {
-                      e.preventDefault();
-                      engineRef.current.touchMoveY = -1;
-                    }}
-                    onTouchEnd={() => (engineRef.current.touchMoveY = 0)}
-                    onMouseDown={() => (engineRef.current.touchMoveY = -1)}
-                    onMouseUp={() => (engineRef.current.touchMoveY = 0)}
-                    className="bg-[#23201a] active:bg-amber-700 border border-[#4a4233] rounded-lg text-sm text-stone-100 font-bold flex items-center justify-center"
-                  >
+                  <div className="bg-[#23201a] border border-[#4a4233] rounded-lg text-sm text-stone-100 font-bold flex items-center justify-center pointer-events-none">
                     ▲
-                  </button>
+                  </div>
                   <div />
-                  <button
-                    onTouchStart={(e) => {
-                      e.preventDefault();
-                      engineRef.current.touchMoveX = -1;
-                    }}
-                    onTouchEnd={() => (engineRef.current.touchMoveX = 0)}
-                    onMouseDown={() => (engineRef.current.touchMoveX = -1)}
-                    onMouseUp={() => (engineRef.current.touchMoveX = 0)}
-                    className="bg-[#23201a] active:bg-amber-700 border border-[#4a4233] rounded-lg text-sm text-stone-100 font-bold flex items-center justify-center"
-                  >
+                  <div className="bg-[#23201a] border border-[#4a4233] rounded-lg text-sm text-stone-100 font-bold flex items-center justify-center pointer-events-none">
                     ◄
-                  </button>
-                  <div className="bg-amber-500/80 border border-amber-200 rounded-full m-1.5 shadow-inner" />
-                  <button
-                    onTouchStart={(e) => {
-                      e.preventDefault();
-                      engineRef.current.touchMoveX = 1;
-                    }}
-                    onTouchEnd={() => (engineRef.current.touchMoveX = 0)}
-                    onMouseDown={() => (engineRef.current.touchMoveX = 1)}
-                    onMouseUp={() => (engineRef.current.touchMoveX = 0)}
-                    className="bg-[#23201a] active:bg-amber-700 border border-[#4a4233] rounded-lg text-sm text-stone-100 font-bold flex items-center justify-center"
-                  >
+                  </div>
+                  <div className="bg-amber-500/85 border border-amber-200 rounded-full m-1.5 shadow-inner pointer-events-none" />
+                  <div className="bg-[#23201a] border border-[#4a4233] rounded-lg text-sm text-stone-100 font-bold flex items-center justify-center pointer-events-none">
                     ►
-                  </button>
+                  </div>
                   <div />
-                  <button
-                    onTouchStart={(e) => {
-                      e.preventDefault();
-                      engineRef.current.touchMoveY = 1;
-                    }}
-                    onTouchEnd={() => (engineRef.current.touchMoveY = 0)}
-                    onMouseDown={() => (engineRef.current.touchMoveY = 1)}
-                    onMouseUp={() => (engineRef.current.touchMoveY = 0)}
-                    className="bg-[#23201a] active:bg-amber-700 border border-[#4a4233] rounded-lg text-sm text-stone-100 font-bold flex items-center justify-center"
-                  >
+                  <div className="bg-[#23201a] border border-[#4a4233] rounded-lg text-sm text-stone-100 font-bold flex items-center justify-center pointer-events-none">
                     ▼
-                  </button>
+                  </div>
                   <div />
                 </div>
                 <span className="mt-1 text-[10px] font-mono-tabular uppercase tracking-wider text-stone-400">
-                  Move
+                  Move Stick
                 </span>
               </div>
 

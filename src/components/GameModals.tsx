@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ActiveModalTab,
   Attributes,
@@ -112,6 +112,12 @@ export const GameModals: React.FC<GameModalsProps> = ({
   const [npcResponseText, setNpcResponseText] = useState<string>('');
   const [npcInnerThought, setNpcInnerThought] = useState<string>('');
   const [isThinking, setIsThinking] = useState<boolean>(false);
+
+  useEffect(() => {
+    setNpcResponseText('');
+    setNpcInnerThought('');
+    setCustomDialogueText('');
+  }, [activeNpcId, activeTab]);
 
   if (activeTab === 'none') return null;
 
@@ -1088,11 +1094,49 @@ export const GameModals: React.FC<GameModalsProps> = ({
                 {/* Quest & World Consequence Decisions */}
                 <div className="space-y-2">
                   <div className="text-xs font-medium text-amber-300">
-                    Consequential World & Quest Decisions:
+                    Direct Services & Consequential World Decisions:
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    {activeNpc.id === 'npc_verenice' && (
+                      <button
+                        onClick={() => {
+                          onQuestDecision('service_verenice_blessing');
+                          setNpcResponseText(
+                            '“Kneel before the First Ember, Wanderer. May its warmth mend your wounds and sear your foes!”'
+                          );
+                        }}
+                        className="px-3 py-1.5 text-xs font-medium bg-amber-800/80 hover:bg-amber-700 text-amber-100 border border-amber-500/50 rounded whitespace-nowrap shrink-0"
+                      >
+                        Receive Ember Blessing (Full Heal & +25% Damage)
+                      </button>
+                    )}
+                    {activeNpc.id === 'npc_korvak' && (
+                      <button
+                        onClick={() => {
+                          onQuestDecision('service_korvak_forge');
+                        }}
+                        className="px-3 py-1.5 text-xs font-medium bg-orange-800/80 hover:bg-orange-700 text-orange-100 border border-orange-500/50 rounded whitespace-nowrap shrink-0"
+                      >
+                        Use Korvak’s Star-Iron Anvil (Craft & Temper Weapons)
+                      </button>
+                    )}
+                    {activeNpc.id === 'npc_malrik' && (
+                      <button
+                        onClick={() => {
+                          onQuestDecision('service_malrik_insight');
+                          setNpcResponseText(
+                            '“Drink deep of the Seventh Star’s shadow. Your steps are veiled from mortal sight.”'
+                          );
+                        }}
+                        className="px-3 py-1.5 text-xs font-medium bg-indigo-900/80 hover:bg-indigo-800 text-indigo-100 border border-indigo-500/50 rounded whitespace-nowrap shrink-0"
+                      >
+                        Attune Umbral Shroud (Full Mana & Stealth Veil)
+                      </button>
+                    )}
                     {activeNpc.id === 'npc_verenice' &&
-                      inventory.some((i) => i.id === 'mat_settlement_grain') && (
+                      inventory.some(
+                        (i) => i.id === 'mat_untainted_grain' || i.id === 'mat_settlement_grain'
+                      ) && (
                         <button
                           onClick={() => {
                             onQuestDecision('donate_grain_verenice');
@@ -1102,7 +1146,7 @@ export const GameModals: React.FC<GameModalsProps> = ({
                           }}
                           className="px-3 py-1.5 text-xs font-medium bg-amber-700 hover:bg-amber-600 text-white rounded whitespace-nowrap shrink-0"
                         >
-                          Deliver Untainted Rations (+Oakhaven Food & Cinder Power)
+                          Deliver Untainted Rations (+Oakhaven Food & +220 Ash)
                         </button>
                       )}
                     {activeNpc.id === 'npc_verenice' &&

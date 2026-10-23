@@ -15,6 +15,82 @@ export interface SimulationTickResult {
   newEvents: WorldEventRecord[];
 }
 
+// Waypoint stations per NPC & Goal so NPCs physically walk between real buildings, shrines, gates & resource nodes
+const NPC_GOAL_WAYPOINTS: Record<
+  string,
+   { regionId: WorldEventRecord['regionId']; points: { x: number; y: number; action: string; speech: string }[] }
+> = {
+  preserve_settlement_supplies: {
+    regionId: 'oakhaven',
+    points: [
+      { x: 840, y: 580, action: 'Tending the First Ember Pyre', speech: 'May the First Ember hold back the ash-frost...' },
+      { x: 680, y: 510, action: 'Inspecting Granary & Apothecary stores', speech: 'Our untainted grain runs dangerously thin.' },
+      { x: 560, y: 460, action: 'Sorting salvaged herb rations', speech: 'Every bundle of purging moss saves a watchman’s life.' },
+    ],
+  },
+  forage_in_bramblewood: {
+    regionId: 'bramblewood',
+    points: [
+      { x: 620, y: 540, action: 'Harvesting wild untainted grain', speech: 'Untainted roots! Oakhaven will eat tonight.' },
+      { x: 810, y: 820, action: 'Gathering luminescent spore-sacs', speech: 'Careful around the Blight Hounds...' },
+      { x: 520, y: 690, action: 'Resting by the Hollowed Root Pyre', speech: 'These spores glow with fallen starlight.' },
+    ],
+  },
+  forge_star_iron_weapons: {
+    regionId: 'oakhaven',
+    points: [
+      { x: 650, y: 795, action: 'Hammering star-iron at the anvil', speech: 'Ring true, star-iron! One more temper!' },
+      { x: 540, y: 865, action: 'Stoking the smithy smelting furnace', speech: 'The bellows need hotter cinders for this blade.' },
+      { x: 380, y: 1010, action: 'Checking the South Crypt gate for Tomas', speech: 'Three nights in that Ossuary... Tomas, lad, where are you?' },
+    ],
+  },
+  search_catacombs_for_apprentice: {
+    regionId: 'catacombs',
+    points: [
+      { x: 860, y: 310, action: 'Searching the Ossuary threshold for Tomas', speech: 'Tomas! Answer me, boy! My hammer is ready!' },
+      { x: 520, y: 560, action: 'Inspecting crypt sarcophagi', speech: 'If Synod traps took him, someone will pay in blood.' },
+    ],
+  },
+  maximize_relic_profits: {
+    regionId: 'oakhaven',
+    points: [
+      { x: 1210, y: 895, action: 'Appraising contraband at Crow’s Perch Bazaar', speech: 'Relics, ciphers, alibis—lowest prices in the Vigil!' },
+      { x: 1020, y: 660, action: 'Eavesdropping near the Ember Plaza', speech: 'Everyone has a secret worth its weight in Sovereign Ash...' },
+      { x: 420, y: 1060, action: 'Checking the Crypt Lift lock', speech: 'Best make sure Korvak never finds that crypt map...' },
+    ],
+  },
+  purge_ironmire_bastion: {
+    regionId: 'oakhaven',
+    points: [
+      { x: 960, y: 280, action: 'Patrolling the North Causeway barricade', speech: 'Hold the North Gate! No Synod assassin passes!' },
+      { x: 1460, y: 640, action: 'Guarding the East Bramblewood Gate', speech: 'Blight Hounds prowl the eastern treeline—stay sharp!' },
+      { x: 960, y: 580, action: 'Warming gauntlets at the First Ember Pyre', speech: 'Seek me out if you need a sworn blade at your side.' },
+    ],
+  },
+  decode_cathedral_runes: {
+    regionId: 'bramblewood',
+    points: [
+      { x: 580, y: 620, action: 'Sampling luminescent spores near Root Pyre', speech: 'Graviturgy + Pyromancy triggers Singularity Conflagration!' },
+      { x: 1360, y: 440, action: 'Measuring leyline resonance at the Moon Altar', speech: 'Fire a Sanguine Lance through a Runic Sigil to split it ×3!' },
+      { x: 1420, y: 340, action: 'Cataloguing Choir tablets at the Field-Station', speech: 'The Sunken Choir’s equations are breathtaking...' },
+    ],
+  },
+  recruit_for_cinder_assault: {
+    regionId: 'bastion',
+    points: [
+      { x: 520, y: 980, action: 'Directing Cinder defences at the Siege Trench', speech: 'Stand fast, Templars! Ironmire will not fall to the Synod!' },
+      { x: 690, y: 740, action: 'Assaulting the central Bastion barricade', speech: 'For the First Ember! Drive Malrik’s Blood-Knights back!' },
+    ],
+  },
+  sabotage_oakhaven_stores: {
+    regionId: 'bastion',
+    points: [
+      { x: 1440, y: 940, action: 'Coordinating Synod Blood-Knights from East Keep', speech: 'Soon the First Ember will choke on its own ash...' },
+      { x: 1120, y: 720, action: 'Skirmishing along the eastern parapet', speech: 'Bring me the Choir Chalice and claim the Eclipse!' },
+    ],
+  },
+};
+
 export function evaluateNPCUtilityAndTickWorld(
   npcs: AutonomousNPC[],
   creatures: CreatureEntity[],
@@ -26,8 +102,8 @@ export function evaluateNPCUtilityAndTickWorld(
     ...worldState,
     tickCount: worldState.tickCount + 1,
     dayTime: (worldState.dayTime + 0.015) % 1,
-    settlementFood: Math.max(8, Math.min(100, worldState.settlementFood - 0.6)),
-    settlementMedicine: Math.max(10, Math.min(100, worldState.settlementMedicine - 0.3)),
+    settlementFood: Math.max(8, Math.min(100, worldState.settlementFood - 0.5)),
+    settlementMedicine: Math.max(10, Math.min(100, worldState.settlementMedicine - 0.25)),
     events: [...worldState.events],
   };
 
@@ -52,8 +128,8 @@ export function evaluateNPCUtilityAndTickWorld(
     nextWorld.events = [evt, ...nextWorld.events].slice(0, 40);
   };
 
-  // Evaluate each NPC's Utility AI & Autonomous Goals
-  const updatedNpcs = npcs.map((npc) => {
+  // Evaluate each NPC's Utility AI & Autonomous Goals + Waypoint Schedules
+  const updatedNpcs = npcs.map((npc, idx) => {
     if (!npc.alive) return npc;
 
     const u: Record<string, number> = { ...npc.utilityScores };
@@ -71,44 +147,45 @@ export function evaluateNPCUtilityAndTickWorld(
 
     // 3. Scarcity & Foraging utility
     if (npc.id === 'npc_verenice') {
-      u.preserve_settlement_supplies = nextWorld.settlementFood < 50 ? 92 : 75;
-      u.forage_in_bramblewood = nextWorld.settlementFood < 35 ? 95 : 48;
+      u.preserve_settlement_supplies = nextWorld.settlementFood >= 40 ? 92 : 74;
+      u.forage_in_bramblewood = nextWorld.settlementFood < 40 ? 95 : 52;
     }
 
     // 4. Korvak's Apprentice & Vengeance utility
     if (npc.id === 'npc_korvak') {
-      const knowsVaneBetrayal = npc.knownFacts.some((f) =>
-        f.toLowerCase().includes('vane betrayed') || f.toLowerCase().includes('vane sold')
+      const knowsVaneBetrayal = npc.knownFacts.some(
+        (f) => f.toLowerCase().includes('vane betrayed') || f.toLowerCase().includes('vane sold')
       );
-      if (knowsVaneBetrayal) {
-        u.hunt_rival = 97;
+      if (knowsVaneBetrayal && npcs.some((n) => n.id === 'npc_vane' && n.alive)) {
+        u.hunt_rival = 98;
       } else {
-        u.forge_star_iron_weapons = 80;
-        u.search_catacombs_for_apprentice = nextWorld.tickCount % 9 === 0 ? 89 : 72;
+        u.hunt_rival = 10;
+        u.forge_star_iron_weapons = 88;
+        u.search_catacombs_for_apprentice = nextWorld.tickCount % 8 === 0 ? 91 : 72;
       }
     }
 
     // 5. Lyra's Runic Research utility
     if (npc.id === 'npc_lyra') {
-      u.decode_cathedral_runes = nextWorld.tickCount % 6 < 3 ? 93 : 68;
-      u.forage_in_bramblewood = nextWorld.tickCount % 6 >= 3 ? 88 : 65;
+      u.decode_cathedral_runes = 93;
+      u.forage_in_bramblewood = nextWorld.tickCount % 5 === 0 ? 89 : 68;
     }
 
     // 6. Vane's Profit & Self-Preservation utility
     if (npc.id === 'npc_vane') {
       const korvakHunting = npcs.find((n) => n.id === 'npc_korvak')?.currentGoal === 'hunt_rival';
-      u.flee_to_safety = korvakHunting ? 94 : u.flee_to_safety;
-      u.maximize_relic_profits = 88;
+      u.flee_to_safety = korvakHunting ? 96 : u.flee_to_safety;
+      u.maximize_relic_profits = 89;
     }
 
     // 7. Faction Commanders (Vael & Malrik)
     if (npc.id === 'npc_vael') {
-      u.recruit_for_cinder_assault = nextWorld.cinderCovenantPower < 60 ? 91 : 74;
-      u.purge_ironmire_bastion = nextWorld.cinderCovenantPower >= 60 ? 95 : 80;
+      u.recruit_for_cinder_assault = nextWorld.cinderCovenantPower < 60 ? 91 : 78;
+      u.purge_ironmire_bastion = nextWorld.cinderCovenantPower >= 60 ? 95 : 84;
     }
     if (npc.id === 'npc_malrik') {
-      u.sabotage_oakhaven_stores = nextWorld.settlementFood > 45 ? 89 : 70;
-      u.hunt_rival = nextWorld.umbralSynodPower >= 60 ? 93 : 72;
+      u.sabotage_oakhaven_stores = nextWorld.settlementFood > 45 ? 90 : 72;
+      u.hunt_rival = nextWorld.umbralSynodPower >= 60 ? 94 : 76;
     }
 
     // Pick highest utility goal
@@ -124,63 +201,65 @@ export function evaluateNPCUtilityAndTickWorld(
     let nextRegion = npc.regionId;
     let nextX = npc.x;
     let nextY = npc.y;
+    let nextTargetX = npc.targetX ?? npc.x;
+    let nextTargetY = npc.targetY ?? npc.y;
     let nextAction = npc.currentAction;
+    let nextSpeech = npc.speechBubble;
+    let nextSpeechTimer = npc.speechTimer || 0;
 
-    // Autonomous off-screen or cross-region goal execution
     if (npc.isCompanion) {
       nextAction = 'Fighting alongside the Sovereign Wanderer';
-    } else if (bestGoal === 'forage_in_bramblewood') {
-      if (npc.regionId !== 'bramblewood' && playerRegion !== npc.regionId) {
-        nextRegion = 'bramblewood';
-        nextX = 560;
-        nextY = 720;
-        pushEvent(
-          `${npc.name} Departs to Forage`,
-          `Driven by dwindling supplies (${Math.round(nextWorld.settlementFood)}%), ${npc.name} ventured into the Weeping Bramblewood to gather untainted roots and spores.`,
-          'bramblewood',
-          'scarcity',
-          'Oakhaven Food +8%'
-        );
+      if (nextWorld.tickCount % 3 === 0) {
+        nextSpeech = 'My blade is with you, Wanderer! Lead the charge!';
+        nextSpeechTimer = 4.5;
       }
-      nextWorld.settlementFood = Math.min(100, nextWorld.settlementFood + 4);
-      nextAction = 'Foraging untainted herbs in Bramblewood';
-    } else if (bestGoal === 'decode_cathedral_runes') {
-      if (npc.regionId !== 'cathedral' && playerRegion !== npc.regionId && nextWorld.tickCount % 5 === 0) {
-        nextRegion = 'cathedral';
-        nextX = 480;
-        nextY = 660;
-        pushEvent(
-          'Lyra Enters the Sunken Cathedral',
-          'Lyra the Blight-Seer traveled to the Cathedral of the Sunken Choir to transcribe the Graviturgy tablets.',
-          'cathedral',
-          'npc_ambition',
-          'Lyra unlocked new Runic insights'
-        );
-      }
-      nextAction = 'Transcribing Runic convergence sigils';
-    } else if (bestGoal === 'search_catacombs_for_apprentice') {
-      if (npc.regionId !== 'catacombs' && playerRegion !== npc.regionId && nextWorld.tickCount % 7 === 0) {
-        nextRegion = 'catacombs';
-        nextX = 320;
-        nextY = 300;
-        pushEvent(
-          'Korvak Descends into the Ossuary',
-          'Unwilling to wait any longer, Master Blacksmith Korvak took up his hammer and entered the Catacombs to search for Tomas.',
-          'catacombs',
-          'npc_ambition',
-          'Korvak is now in the Ossuary'
-        );
-      }
-      nextAction = 'Searching the Ossuary shadows for Apprentice Tomas';
     } else if (bestGoal === 'hunt_rival' && npc.id === 'npc_korvak') {
-      nextAction = 'Hunting Vane the Crow-Tongue for betraying Tomas';
-    } else if (bestGoal === 'preserve_settlement_supplies') {
-      if (npc.regionId !== 'oakhaven' && playerRegion !== npc.regionId) {
-        nextRegion = 'oakhaven';
-        nextX = 820;
-        nextY = 560;
+      const vane = npcs.find((n) => n.id === 'npc_vane' && n.alive);
+      if (vane) {
+        nextRegion = vane.regionId;
+        nextTargetX = vane.x;
+        nextTargetY = vane.y;
+        nextAction = 'Charging to execute Vane the Crow-Tongue for betraying Tomas!';
+        nextSpeech = 'VANE! You sold Tomas to those crypt traps! Face my hammer!';
+        nextSpeechTimer = 6.0;
       }
-      nextAction = 'Tending the First Ember & rationing stores';
+    } else {
+      const schedule = NPC_GOAL_WAYPOINTS[bestGoal];
+      if (schedule) {
+        // If NPC needs to change region for this high-utility goal
+        if (npc.regionId !== schedule.regionId && nextWorld.tickCount % 4 === 0) {
+          nextRegion = schedule.regionId;
+          const pt0 = schedule.points[0];
+          nextX = pt0.x;
+          nextY = pt0.y;
+          nextTargetX = pt0.x;
+          nextTargetY = pt0.y;
+          nextAction = pt0.action;
+          nextSpeech = pt0.speech;
+          nextSpeechTimer = 5.0;
+          pushEvent(
+            `${npc.name} Travels to ${REGIONS[nextRegion].name}`,
+            `${npc.name} departed for ${REGIONS[nextRegion].name} to pursue goal "${bestGoal.replace(/_/g, ' ')}".`,
+            nextRegion,
+            'npc_ambition',
+            pt0.action
+          );
+        } else if (npc.regionId === schedule.regionId) {
+          // Cycle through physical waypoints in the region so NPCs actively walk & work!
+          const wpIndex = (nextWorld.tickCount + idx) % schedule.points.length;
+          const wp = schedule.points[wpIndex];
+          nextTargetX = wp.x;
+          nextTargetY = wp.y;
+          nextAction = wp.action;
+          if ((nextWorld.tickCount + idx) % 2 === 0) {
+            nextSpeech = wp.speech;
+            nextSpeechTimer = 4.8;
+          }
+        }
+      }
+      if (bestGoal === 'forage_in_bramblewood') {
+        nextWorld.settlementFood = Math.min(100, nextWorld.settlementFood + 3.5);
+      }
     }
 
     return {
@@ -188,8 +267,12 @@ export function evaluateNPCUtilityAndTickWorld(
       regionId: nextRegion,
       x: nextX,
       y: nextY,
+      targetX: nextTargetX,
+      targetY: nextTargetY,
       currentGoal: bestGoal,
       currentAction: nextAction,
+      speechBubble: nextSpeech,
+      speechTimer: nextSpeechTimer,
       utilityScores: u,
       lastDecisionTick: nextWorld.tickCount,
     };
@@ -202,7 +285,7 @@ export function evaluateNPCUtilityAndTickWorld(
       const b = updatedNpcs[j];
       if (!a.alive || !b.alive || a.regionId !== b.regionId) continue;
       const dist = Math.hypot(a.x - b.x, a.y - b.y);
-      if (dist < 380) {
+      if (dist < 340) {
         const rel = a.relationships[b.id]?.affinity ?? 0;
         if (rel > -50 && a.memories.length > 0) {
           const latestMem = a.memories[a.memories.length - 1];
@@ -210,6 +293,8 @@ export function evaluateNPCUtilityAndTickWorld(
           if (!b.knownFacts.includes(factStr)) {
             b.knownFacts = [...b.knownFacts, factStr].slice(-12);
             b.trust = Math.max(-100, Math.min(100, b.trust + Math.sign(latestMem.sentiment) * 3));
+            b.speechBubble = `Speaking with ${a.name.split(' ')[0]} about recent tidings...`;
+            b.speechTimer = 4.2;
           }
         }
       }
@@ -217,15 +302,15 @@ export function evaluateNPCUtilityAndTickWorld(
   }
 
   // Emergent World Event Triggers based on Simulation Thresholds
-  if (nextWorld.tickCount % 6 === 0) {
+  if (nextWorld.tickCount % 5 === 0) {
     if (nextWorld.settlementFood < 32) {
-      nextWorld.settlementMorale = Math.max(10, nextWorld.settlementMorale - 8);
+      nextWorld.settlementMorale = Math.max(10, nextWorld.settlementMorale - 6);
       pushEvent(
         'Famine Grips Oakhaven Vigil',
         'Food reserves have fallen below critical levels. Inhabitants grow desperate, merchant prices rise, and Blight Hounds prowl closer to the East Gate.',
         'oakhaven',
         'scarcity',
-        'Morale -8%, Predator aggression increased'
+        'Morale -6%, Sister Verenice dispatched to forage'
       );
     } else if (nextWorld.cinderCovenantPower - nextWorld.umbralSynodPower > 18) {
       nextWorld.bastionController = 'cinder_covenant';
@@ -258,11 +343,11 @@ export function evaluateNPCUtilityAndTickWorld(
       } else {
         const regName = REGIONS[playerRegion as keyof typeof REGIONS]?.name || 'Ashen Fields';
         pushEvent(
-          'Shifting Winds of the Seventh Star',
-          `Ash-clouds drift across ${regName} as predators stalk the perimeter and factions fortify their watchposts.`,
+          'Patrols Clash Along the Ash-Roads',
+          `Watchmen and faction scouts maneuver across ${regName} as the Seventh Star’s eclipse deepens.`,
           playerRegion as WorldEventRecord['regionId'],
           'ecology',
-          'Living world simulation active'
+          'Autonomous NPC schedules updated'
         );
       }
     }
